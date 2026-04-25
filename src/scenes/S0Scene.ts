@@ -80,7 +80,8 @@ export class S0Scene extends Phaser.Scene {
   }
 
   private render() {
-    this.children.removeAll();
+    for (const child of [...this.children.getChildren()]) child.destroy();
+
     this.cameras.main.setBackgroundColor(colors.void);
     this.drawShell();
     this.drawViewport();
@@ -167,13 +168,14 @@ export class S0Scene extends Phaser.Scene {
     });
 
     const heldLabel = combat.held ? combat.held.name : 'empty';
-    g.lineStyle(1, colors.gold, 1).strokeRect(TRAY.x + 306, TRAY.y + 6, 78, 14);
-    this.label(`Hold: ${heldLabel}`, TRAY.x + 310, TRAY.y + 9, '#f2c36b');
+    const heldSelected = combat.held?.id === this.selectedCardId;
+    g.lineStyle(1, heldSelected ? colors.cyan : colors.gold, 1).strokeRect(TRAY.x + 306, TRAY.y + 6, 78, 14);
+    this.label(`Hold: ${heldLabel}`, TRAY.x + 310, TRAY.y + 9, heldSelected ? '#6fb1d6' : '#f2c36b');
     this.add
       .zone(TRAY.x + 306, TRAY.y + 6, 78, 14)
       .setOrigin(0)
       .setInteractive()
-      .on('pointerdown', () => this.holdSelected());
+      .on('pointerdown', () => this.selectHeldOrHold());
   }
 
   private drawCard(card: CardDef, x: number, y: number) {
@@ -273,8 +275,23 @@ export class S0Scene extends Phaser.Scene {
 
   private holdSelected() {
     if (!this.selectedCardId || this.state.mode !== 'combat') return;
-    this.dispatch({ type: 'hold-card', cardId: this.selectedCardId });
+    const cardId = this.selectedCardId;
     this.selectedCardId = null;
+    this.dispatch({ type: 'hold-card', cardId });
+  }
+
+  private selectHeldOrHold() {
+    if (this.state.mode !== 'combat') return;
+    const heldCard = this.state.combat?.held;
+
+    if (!heldCard) {
+      this.holdSelected();
+      return;
+    }
+
+    this.selectedCardId = heldCard.id;
+    this.tone(260, 35);
+    this.render();
   }
 
   private playSelected() {

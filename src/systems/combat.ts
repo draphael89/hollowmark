@@ -65,8 +65,8 @@ export function createCombat(seed: string): CombatState {
     enemy: {
       id: 'root-wolf',
       name: 'Rootbitten Wolf',
-      hp: 24,
-      maxHp: 24,
+      hp: 22,
+      maxHp: 22,
       block: 0,
       marked: false,
       intent: 'Bite Liese for 6',

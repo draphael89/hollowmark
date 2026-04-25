@@ -17,6 +17,8 @@ export function createSliceState(seed = 's0-root-wolf'): SliceState {
 
 export function applyCommand(state: SliceState, command: SliceCommand): SliceState {
   const next = applyCommandInner(state, command);
+  if (next === state) return state;
+
   return {
     ...next,
     commandLog: [...state.commandLog, command],
@@ -28,12 +30,12 @@ export function runReplay(commands: SliceCommand[], seed = 's0-root-wolf'): Slic
 }
 
 function applyCommandInner(state: SliceState, command: SliceCommand): SliceState {
-  if (command.type === 'step-forward') return attemptStep(state, 'forward').state;
-  if (command.type === 'step-back') return attemptStep(state, 'back').state;
-  if (command.type === 'turn-left') return turn(state, 'left');
-  if (command.type === 'turn-right') return turn(state, 'right');
+  if (command.type === 'step-forward') return state.mode === 'explore' ? attemptStep(state, 'forward').state : state;
+  if (command.type === 'step-back') return state.mode === 'explore' ? attemptStep(state, 'back').state : state;
+  if (command.type === 'turn-left') return state.mode === 'explore' ? turn(state, 'left') : state;
+  if (command.type === 'turn-right') return state.mode === 'explore' ? turn(state, 'right') : state;
   if (command.type === 'interact') return interact(state);
-  if (command.type === 'hold-card') return withCombat(state, holdCard(state.combat!, command.cardId));
+  if (command.type === 'hold-card') return withCombat(state, holdCard(assertCombat(state), command.cardId));
   return playCombatCard(state, command.cardId);
 }
 
