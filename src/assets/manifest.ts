@@ -1,51 +1,49 @@
+export const ASSET_MANIFEST_KEY = 'asset-manifest';
+export const ASSET_MANIFEST_URL = '/assets/manifest.json';
+
+export type AssetKind = 'background' | 'sprite' | 'card-art' | 'ui';
+export type AssetStatus = 'placeholder' | 'raw_generated' | 'candidate' | 'processed' | 'in_game_previewed' | 'approved' | 'manifested';
+
 export type AssetManifestEntry = Readonly<{
   id: string;
-  kind: 'background' | 'sprite' | 'card-art' | 'ui';
-  status: 'processed';
+  kind: AssetKind;
+  status: AssetStatus;
   title: string;
   reviewFocus: string;
   previewPath: string;
 }>;
 
-export const PLACEHOLDER_ASSETS: readonly AssetManifestEntry[] = [
-  {
-    id: 'underroot.corridor.placeholder',
-    kind: 'background',
-    status: 'processed',
-    title: 'Underroot Corridor',
-    reviewFocus: 'depth, tile read, no text',
-    previewPath: '/assets/drafts/underroot/batch-01/underroot-corridor-preview-01.png',
-  },
-  {
-    id: 'underroot.combat.placeholder',
-    kind: 'background',
-    status: 'processed',
-    title: 'Underroot Combat',
-    reviewFocus: 'enemy contrast, floor contact, no text',
-    previewPath: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
-  },
-  {
-    id: 'enemy.root-wolf.placeholder',
-    kind: 'sprite',
-    status: 'processed',
-    title: 'Rootbitten Wolf',
-    reviewFocus: 'silhouette, intent read, hit flash',
-    previewPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-preview-01.png',
-  },
-  {
-    id: 'card.blood-edge.placeholder',
-    kind: 'card-art',
-    status: 'processed',
-    title: 'Blood Edge',
-    reviewFocus: 'temptation, danger, crop safety',
-    previewPath: '/assets/drafts/underroot/batch-01/blood-edge-preview-01.png',
-  },
-  {
-    id: 'ui.ornaments.placeholder',
-    kind: 'ui',
-    status: 'processed',
-    title: 'UI Ornaments',
-    reviewFocus: 'panel corners, status frames, palette restraint',
-    previewPath: '/assets/drafts/underroot/batch-01/ui-ornaments-preview-01.png',
-  },
-];
+type AssetPassport = Readonly<{
+  id: string;
+  kind: AssetKind;
+  title: string;
+  reviewFocus: string;
+  approvalState: AssetStatus;
+  processedPath: string | null;
+}>;
+
+type PublicAssetManifest = Readonly<{
+  version: number;
+  assets: readonly AssetPassport[];
+}>;
+
+export function galleryAssetsFromManifest(value: unknown): readonly AssetManifestEntry[] {
+  const manifest = value as PublicAssetManifest;
+  if (manifest.version !== 1 || !Array.isArray(manifest.assets)) {
+    throw new Error('Asset manifest must be version 1 with an assets array.');
+  }
+  return manifest.assets.map((asset) => ({
+    id: asset.id,
+    kind: asset.kind,
+    status: asset.approvalState,
+    title: asset.title,
+    reviewFocus: asset.reviewFocus,
+    previewPath: previewPathFor(asset),
+  }));
+}
+
+function previewPathFor(asset: AssetPassport): string {
+  if (!asset.processedPath) throw new Error(`${asset.id} is missing processedPath for gallery preview.`);
+  if (!asset.processedPath.startsWith('public/')) throw new Error(`${asset.id} processedPath must be public for gallery preview.`);
+  return asset.processedPath.slice('public'.length);
+}

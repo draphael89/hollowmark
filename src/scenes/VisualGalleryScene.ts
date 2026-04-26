@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PLACEHOLDER_ASSETS } from '../assets/manifest';
+import { ASSET_MANIFEST_KEY, ASSET_MANIFEST_URL, type AssetManifestEntry, galleryAssetsFromManifest } from '../assets/manifest';
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/layout';
 import { THEME } from '../game/theme';
 import { publishDevSceneDebug } from './devSceneDebug';
@@ -15,6 +15,7 @@ const SELECTED_PREVIEW = { x: 330, y: 276, w: 250, h: 58 };
 
 export class VisualGalleryScene extends Phaser.Scene {
   private cardsGfx!: Phaser.GameObjects.Graphics;
+  private assets: readonly AssetManifestEntry[] = [];
   private selectedGfx!: Phaser.GameObjects.Graphics;
   private detailTitle!: Phaser.GameObjects.Text;
   private detailBody!: Phaser.GameObjects.Text;
@@ -27,12 +28,19 @@ export class VisualGalleryScene extends Phaser.Scene {
   }
 
   preload(): void {
-    for (const asset of PLACEHOLDER_ASSETS) {
-      this.load.image(asset.id, asset.previewPath);
-    }
+    this.load.json(ASSET_MANIFEST_KEY, ASSET_MANIFEST_URL);
   }
 
   create(): void {
+    this.assets = galleryAssetsFromManifest(this.cache.json.get(ASSET_MANIFEST_KEY));
+    for (const asset of this.assets) {
+      this.load.image(asset.id, asset.previewPath);
+    }
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => this.createGallery());
+    this.load.start();
+  }
+
+  private createGallery(): void {
     const g = this.add.graphics();
     g.fillStyle(colors.void, 1).fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     g.fillStyle(colors.panel, 1).fillRect(16, 16, 608, 328);
@@ -41,7 +49,7 @@ export class VisualGalleryScene extends Phaser.Scene {
 
     this.cardsGfx = this.add.graphics();
     this.selectedGfx = this.add.graphics();
-    PLACEHOLDER_ASSETS.forEach((asset, index) => {
+    this.assets.forEach((asset, index) => {
       const x = 42 + (index % 2) * 286;
       const y = 62 + Math.floor(index / 2) * CARD_GAP_Y;
       this.add.zone(x, y, CARD_W, CARD_H)
@@ -74,8 +82,8 @@ export class VisualGalleryScene extends Phaser.Scene {
     ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'].forEach((key, index) => {
       this.input.keyboard?.on(`keydown-${key}`, () => this.selectAsset(index));
     });
-    this.input.keyboard?.on('keydown-RIGHT', () => this.selectAsset((this.selectedIndex + 1) % PLACEHOLDER_ASSETS.length));
-    this.input.keyboard?.on('keydown-LEFT', () => this.selectAsset((this.selectedIndex + PLACEHOLDER_ASSETS.length - 1) % PLACEHOLDER_ASSETS.length));
+    this.input.keyboard?.on('keydown-RIGHT', () => this.selectAsset((this.selectedIndex + 1) % this.assets.length));
+    this.input.keyboard?.on('keydown-LEFT', () => this.selectAsset((this.selectedIndex + this.assets.length - 1) % this.assets.length));
   }
 
   private selectAsset(index: number): void {
@@ -91,7 +99,7 @@ export class VisualGalleryScene extends Phaser.Scene {
     this.previewImages = [];
     this.selectedPreview?.destroy();
     this.selectedPreview = undefined;
-    PLACEHOLDER_ASSETS.forEach((asset, index) => {
+    this.assets.forEach((asset, index) => {
       const x = 42 + (index % 2) * 286;
       const y = 62 + Math.floor(index / 2) * CARD_GAP_Y;
       const selected = index === this.selectedIndex;
@@ -101,7 +109,7 @@ export class VisualGalleryScene extends Phaser.Scene {
     });
   }
 
-  private drawAssetPreview(asset: (typeof PLACEHOLDER_ASSETS)[number], x: number, y: number): void {
+  private drawAssetPreview(asset: AssetManifestEntry, x: number, y: number): void {
     if (this.textures.exists(asset.id)) {
       const image = this.add.image(x, y, asset.id);
       image.setDisplaySize(...previewSize(asset.kind));
@@ -131,7 +139,7 @@ export class VisualGalleryScene extends Phaser.Scene {
   }
 
   private drawDetails(): void {
-    const asset = PLACEHOLDER_ASSETS[this.selectedIndex];
+    const asset = this.assets[this.selectedIndex];
     this.drawSelectedPreview(asset);
     this.detailTitle.setText(`Selected ${this.selectedIndex + 1}: ${asset.title}`);
     this.detailBody.setText([
@@ -141,7 +149,7 @@ export class VisualGalleryScene extends Phaser.Scene {
     ]);
   }
 
-  private drawSelectedPreview(asset: (typeof PLACEHOLDER_ASSETS)[number]): void {
+  private drawSelectedPreview(asset: AssetManifestEntry): void {
     this.selectedGfx.clear();
     this.selectedGfx.fillStyle(colors.panelDeep, 1).fillRect(SELECTED_PREVIEW.x, SELECTED_PREVIEW.y, SELECTED_PREVIEW.w, SELECTED_PREVIEW.h);
     this.selectedGfx.lineStyle(1, colors.stoneLight, 1).strokeRect(SELECTED_PREVIEW.x, SELECTED_PREVIEW.y, SELECTED_PREVIEW.w, SELECTED_PREVIEW.h);
@@ -152,28 +160,28 @@ export class VisualGalleryScene extends Phaser.Scene {
   }
 
   private publishDebug(): void {
-    const asset = PLACEHOLDER_ASSETS[this.selectedIndex];
+    const asset = this.assets[this.selectedIndex];
     publishDevSceneDebug(this, 'visual-gallery', asset.id, {
       visualGallery: {
-        assetCount: PLACEHOLDER_ASSETS.length,
+        assetCount: this.assets.length,
         selectedId: asset.id,
         selectedKind: asset.kind,
         selectedStatus: asset.status,
         selectedReviewFocus: asset.reviewFocus,
-        stableIds: PLACEHOLDER_ASSETS.map((entry) => entry.id),
+        stableIds: this.assets.map((entry) => entry.id),
       },
     });
   }
 }
 
-function previewSize(kind: (typeof PLACEHOLDER_ASSETS)[number]['kind']): [number, number] {
+function previewSize(kind: AssetManifestEntry['kind']): [number, number] {
   if (kind === 'background') return [70, 40];
   if (kind === 'sprite') return [34, 46];
   if (kind === 'card-art') return [54, 40];
   return [46, 46];
 }
 
-function selectedPreviewSize(kind: (typeof PLACEHOLDER_ASSETS)[number]['kind']): [number, number] {
+function selectedPreviewSize(kind: AssetManifestEntry['kind']): [number, number] {
   if (kind === 'background') return [210, 58];
   if (kind === 'sprite') return [44, 58];
   if (kind === 'card-art') return [78, 58];
