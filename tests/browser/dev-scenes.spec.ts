@@ -218,7 +218,7 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
 
   let debug = await getDevDebug(page);
   expect(debug.visualGallery).toEqual(expect.objectContaining({
-    assetCount: 4,
+    assetCount: 5,
     selectedId: 'underroot.corridor.placeholder',
     selectedKind: 'background',
     selectedStatus: 'placeholder',
@@ -226,12 +226,13 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
   }));
   expect(debug.visualGallery?.stableIds).toEqual([
     'underroot.corridor.placeholder',
+    'underroot.combat.placeholder',
     'enemy.root-wolf.placeholder',
     'card.blood-edge.placeholder',
-    'ui.debt-mark.placeholder',
+    'ui.ornaments.placeholder',
   ]);
 
-  await page.keyboard.press('Digit3');
+  await page.keyboard.press('Digit4');
   await expect.poll(async () => (await getDevDebug(page)).label).toBe('card.blood-edge.placeholder');
   debug = await getDevDebug(page);
   expect(debug.visualGallery).toEqual(expect.objectContaining({
@@ -240,9 +241,9 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
     selectedReviewFocus: 'temptation, danger, crop safety',
   }));
 
-  await page.keyboard.press('Digit4');
-  await expect.poll(async () => (await getDevDebug(page)).label).toBe('ui.debt-mark.placeholder');
-  await canvas.click({ position: { x: 448, y: 106 } });
+  await page.keyboard.press('Digit5');
+  await expect.poll(async () => (await getDevDebug(page)).label).toBe('ui.ornaments.placeholder');
+  await canvas.click({ position: { x: 162, y: 158 } });
   await expect.poll(async () => (await getDevDebug(page)).label).toBe('enemy.root-wolf.placeholder');
   debug = await getDevDebug(page);
   expect(debug.visualGallery).toEqual(expect.objectContaining({

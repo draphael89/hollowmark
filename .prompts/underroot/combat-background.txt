@@ -1,0 +1,7 @@
+Create a textless first-person dungeon-crawler combat room plate.
+Scene: Underroot combat chamber, low stone floor, red moss pressure, root arch framing a clear enemy silhouette space in the center.
+Camera: fixed first-person RPG battle view, centered enemy stage, readable floor contact shadow, no UI.
+Style: moonlit oxblood dungeon manuscript; painterly pixel-art source for a 16-bit-inspired first-person dungeon RPG; high-contrast silhouettes; deep indigo shadows; bone-colored highlights; muted oxblood accents; damp low-fantasy horror; limited-palette feeling; no clean modern UI; no text.
+Lighting: warm torch from front-left plus cold blue rim from upper-right.
+Use: source image will be cropped, palette-quantized, and downsampled into a 392x220 combat viewport plate.
+Avoid: readable letters, characters, weapons in foreground, bright saturated colors, photorealism, smooth vector art.

@@ -1,0 +1,7 @@
+Create a textless first-person dungeon-crawler scene plate.
+Scene: Underroot corridor where roots reclaim indigo stone, with a black root seam leading deeper and a hint of warm torchlight behind the viewer.
+Camera: fixed grid-tile view, old-school first-person RPG perspective, centered focal point, strong foreground frame, deep black distance.
+Style: moonlit oxblood dungeon manuscript; painterly pixel-art source for a 16-bit-inspired first-person dungeon RPG; high-contrast silhouettes; deep indigo shadows; bone-colored highlights; muted oxblood accents; sparse warm torch light; damp low-fantasy horror; limited-palette feeling; no clean modern UI; no text.
+Lighting: warm off-screen torch plus cold moon ambience.
+Use: source image will be cropped, palette-quantized, and downsampled into a 392x220 viewport.
+Avoid: readable letters, UI, characters, wide-angle distortion, bright fantasy colors, photorealism, smooth vector art.

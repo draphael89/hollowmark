@@ -120,14 +120,37 @@ describe('mode-safe slice reducer', () => {
     expect(interactions.map((tile) => tile.interaction?.id)).toEqual([
       'underroot-rest-1',
       'underroot-normal-1',
-      'underroot-reward-1',
-      'underroot-shortcut-1',
+      'underroot-normal-2',
+      'underroot-reward-2',
       'underroot-return-1',
+      'underroot-reward-1',
+      'underroot-normal-3',
+      'underroot-normal-5',
       'underroot-boss-1',
+      'underroot-shortcut-1',
+      'underroot-reward-3',
+      'underroot-normal-4',
+      'underroot-elite-1',
     ]);
     for (const tile of interactions) {
       expect(reachable.has(tileKey(tile.coord)), `${tile.interaction?.id} at ${tileKey(tile.coord)} should be reachable`).toBe(true);
     }
+  });
+
+  it('matches the M2 placeholder content targets before visual production', () => {
+    const floor = floorForId(UNDERROOT_M2_FLOOR_ID);
+    const interactions = floor.tiles.flatMap((tile) => tile.interaction ? [tile.interaction] : []);
+    const combatIds = interactions.filter((interaction) => interaction.type === 'combat').map((interaction) => interaction.id);
+
+    expect(floor.tiles).toHaveLength(15);
+    expect(combatIds.filter((id) => id.startsWith('underroot-normal-'))).toHaveLength(5);
+    expect(combatIds).toContain('underroot-elite-1');
+    expect(combatIds).toContain('underroot-boss-1');
+    expect(interactions.filter((interaction) => interaction.type === 'reward')).toHaveLength(3);
+    expect(interactions.filter((interaction) => interaction.type === 'rest')).toHaveLength(1);
+    expect(interactions.filter((interaction) => interaction.type === 'shortcut')).toHaveLength(1);
+    expect(interactions.filter((interaction) => interaction.type === 'return-town')).toHaveLength(1);
+    expect(new Set(floor.tiles.map((tile) => tile.visualRecipe)).size).toBeGreaterThanOrEqual(10);
   });
 
   it('resolves authored rest, reward, and shortcut tile interactions once', () => {
@@ -255,6 +278,28 @@ describe('mode-safe slice reducer', () => {
     expect(result.state.completedInteractions).toContain('underroot-normal-1');
     expect(result.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-normal-1', interaction: 'combat' });
     expect(result.events).not.toContainEqual({ type: 'MARROWGATE_RETURNED' });
+  });
+
+  it('returns to Underroot exploration after the elite placeholder fight', () => {
+    let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    state = applyCommand({ ...state, position: { x: 4, y: 2 }, threat: 'hunted' }, { type: 'interact' }).state;
+    expect(state.mode).toBe('combat');
+    expect(state.activeInteractionId).toBe('underroot-elite-1');
+    expect(state.combatReturn).toBe('explore');
+    state = {
+      ...state,
+      combat: {
+        ...state.combat!,
+        enemy: { ...state.combat!.enemy, hp: 1 },
+      },
+    };
+    const cardId = state.combat!.hand[0]!;
+
+    const result = applyCommand(state, { type: 'play-card', cardId });
+
+    expect(result.state.mode).toBe('explore');
+    expect(result.state.completedInteractions).toContain('underroot-elite-1');
+    expect(result.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-elite-1', interaction: 'combat' });
   });
 });
 

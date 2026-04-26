@@ -8,7 +8,8 @@ const colors = THEME.color;
 const text = THEME.text;
 const textStyle = THEME.textStyle;
 const CARD_W = 242;
-const CARD_H = 74;
+const CARD_H = 58;
+const CARD_GAP_Y = 68;
 const DETAIL_W = 540;
 
 export class VisualGalleryScene extends Phaser.Scene {
@@ -31,7 +32,7 @@ export class VisualGalleryScene extends Phaser.Scene {
     this.cardsGfx = this.add.graphics();
     PLACEHOLDER_ASSETS.forEach((asset, index) => {
       const x = 42 + (index % 2) * 286;
-      const y = 68 + Math.floor(index / 2) * 104;
+      const y = 62 + Math.floor(index / 2) * CARD_GAP_Y;
       this.add.zone(x, y, CARD_W, CARD_H)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
@@ -39,7 +40,7 @@ export class VisualGalleryScene extends Phaser.Scene {
       this.label(`${index + 1}`, x + 12, y + 12, text.gold);
       this.label(asset.title, x + 72, y + 14, text.bone);
       this.label(compactAssetId(asset.id), x + 72, y + 32, text.mutedBone);
-      this.label(`${asset.kind} / ${asset.status}`, x + 72, y + 50, text.cyan);
+      this.label(`${asset.kind} / ${asset.status}`, x + 72, y + 46, text.cyan);
     });
 
     this.detailTitle = this.add.text(42, 282, '', { ...textStyle, color: text.gold });
@@ -58,7 +59,7 @@ export class VisualGalleryScene extends Phaser.Scene {
   }
 
   private bindKeys(): void {
-    ['ONE', 'TWO', 'THREE', 'FOUR'].forEach((key, index) => {
+    ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'].forEach((key, index) => {
       this.input.keyboard?.on(`keydown-${key}`, () => this.selectAsset(index));
     });
     this.input.keyboard?.on('keydown-RIGHT', () => this.selectAsset((this.selectedIndex + 1) % PLACEHOLDER_ASSETS.length));
@@ -76,7 +77,7 @@ export class VisualGalleryScene extends Phaser.Scene {
     this.cardsGfx.clear();
     PLACEHOLDER_ASSETS.forEach((asset, index) => {
       const x = 42 + (index % 2) * 286;
-      const y = 68 + Math.floor(index / 2) * 104;
+      const y = 62 + Math.floor(index / 2) * CARD_GAP_Y;
       const selected = index === this.selectedIndex;
       this.cardsGfx.fillStyle(colors.panelDeep, 1).fillRect(x, y, CARD_W, CARD_H);
       this.cardsGfx.lineStyle(selected ? 2 : 1, selected ? colors.gold : colors.stoneLight, 1).strokeRect(x, y, CARD_W, CARD_H);

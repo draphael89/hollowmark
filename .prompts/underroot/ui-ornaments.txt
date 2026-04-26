@@ -1,0 +1,6 @@
+Create a textless UI ornament sheet for a dark pixel-art dungeon RPG.
+Contents: restrained panel corners, thin borders, dividers, button plates, card-frame corners, status-icon frames.
+Style: moonlit oxblood dungeon manuscript, 16-bit RPG interface, dark indigo panels, oxblood enamel borders, bone/gold accents, worn metal, carved parchment.
+Composition: separated items on a simple dark background, no words, no numbers, no logos, no full screen mockup.
+Use: will be sliced into Phaser UI pieces and palette-quantized.
+Avoid: modern clean UI, glossy mobile game style, excessive decoration, readable text, neon colors.
