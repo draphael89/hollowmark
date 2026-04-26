@@ -1,56 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="654" viewBox="0 0 1200 654">
-  <rect width="1200" height="654" fill="#09080d"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="844" viewBox="0 0 1200 844">
+  <rect width="1200" height="844" fill="#09080d"/>
   <text x="36" y="44" fill="#d9c69a" font-family="monospace" font-size="24">HOLLOWMARK Underroot Batch 01</text>
   <text x="36" y="72" fill="#8b8174" font-family="monospace" font-size="14">Draft contact sheet: source generation candidates must beat these contracts before processing.</text>
   <g>
-    <rect x="32" y="104" width="1136" height="92" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
-    <rect x="42" y="126" width="64" height="48" fill="#252638"/><rect x="50" y="156" width="48" height="8" fill="#31483c"/><rect x="66" y="132" width="16" height="36" fill="#702231"/>
-    <text x="126" y="128" fill="#d9c69a" font-family="monospace" font-size="18">Underroot Corridor</text>
-    <text x="126" y="150" fill="#b8aa91" font-family="monospace" font-size="13">underroot.corridor.placeholder</text>
-    <text x="126" y="170" fill="#6fb6b4" font-family="monospace" font-size="13">background / placeholder / 392x220</text>
-    <text x="520" y="132" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: depth, tile read, no text</text>
-    <text x="520" y="154" fill="#8b8174" font-family="monospace" font-size="12">Prompt: environment-plate.txt</text>
-    <text x="520" y="174" fill="#8b8174" font-family="monospace" font-size="12">Create a textless first-person dungeon-crawler scene plate.</text>
+    <rect x="32" y="104" width="1136" height="130" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
+    <rect x="48" y="122" width="170" height="104" fill="#09080d" stroke="#403848"/>
+    <image href="../../public/assets/drafts/underroot/batch-01/underroot-corridor-preview-01.png" x="48" y="127" width="170" height="95" image-rendering="pixelated"/>
+    <text x="250" y="132" fill="#d9c69a" font-family="monospace" font-size="18">Underroot Corridor</text>
+    <text x="250" y="154" fill="#b8aa91" font-family="monospace" font-size="13">underroot.corridor.placeholder</text>
+    <text x="250" y="174" fill="#6fb6b4" font-family="monospace" font-size="13">background / processed / 392x220</text>
+    <text x="250" y="196" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: depth, tile read, no text</text>
+    <text x="250" y="216" fill="#8b8174" font-family="monospace" font-size="12">Prompt: environment-plate.txt / Create a textless first-person dungeon-crawler scene plate.</text>
   </g>
   <g>
-    <rect x="32" y="216" width="1136" height="92" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
-    <rect x="42" y="238" width="64" height="48" fill="#252638"/><rect x="50" y="268" width="48" height="8" fill="#31483c"/><rect x="66" y="244" width="16" height="36" fill="#702231"/>
-    <text x="126" y="240" fill="#d9c69a" font-family="monospace" font-size="18">Underroot Combat</text>
-    <text x="126" y="262" fill="#b8aa91" font-family="monospace" font-size="13">underroot.combat.placeholder</text>
-    <text x="126" y="282" fill="#6fb6b4" font-family="monospace" font-size="13">background / placeholder / 392x220</text>
-    <text x="520" y="244" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: enemy contrast, floor contact, no text</text>
-    <text x="520" y="266" fill="#8b8174" font-family="monospace" font-size="12">Prompt: combat-background.txt</text>
-    <text x="520" y="286" fill="#8b8174" font-family="monospace" font-size="12">Create a textless first-person dungeon-crawler combat room plate.</text>
+    <rect x="32" y="254" width="1136" height="130" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
+    <rect x="48" y="272" width="170" height="104" fill="#09080d" stroke="#403848"/>
+    <image href="../../public/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png" x="48" y="277" width="170" height="95" image-rendering="pixelated"/>
+    <text x="250" y="282" fill="#d9c69a" font-family="monospace" font-size="18">Underroot Combat</text>
+    <text x="250" y="304" fill="#b8aa91" font-family="monospace" font-size="13">underroot.combat.placeholder</text>
+    <text x="250" y="324" fill="#6fb6b4" font-family="monospace" font-size="13">background / processed / 392x220</text>
+    <text x="250" y="346" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: enemy contrast, floor contact, no text</text>
+    <text x="250" y="366" fill="#8b8174" font-family="monospace" font-size="12">Prompt: combat-background.txt / Create a textless first-person dungeon-crawler combat room plate.</text>
   </g>
   <g>
-    <rect x="32" y="328" width="1136" height="92" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
-    <path d="M 44 402 L 74 344 L 104 402 Z" fill="#702231"/><circle cx="64" cy="370" r="4" fill="#d9c69a"/><circle cx="84" cy="370" r="4" fill="#d9c69a"/>
-    <text x="126" y="352" fill="#d9c69a" font-family="monospace" font-size="18">Rootbitten Wolf</text>
-    <text x="126" y="374" fill="#b8aa91" font-family="monospace" font-size="13">enemy.root-wolf.placeholder</text>
-    <text x="126" y="394" fill="#6fb6b4" font-family="monospace" font-size="13">sprite / placeholder / 96x128</text>
-    <text x="520" y="356" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: silhouette, intent read, hit flash</text>
-    <text x="520" y="378" fill="#8b8174" font-family="monospace" font-size="12">Prompt: root-wolf-enemy.txt</text>
-    <text x="520" y="398" fill="#8b8174" font-family="monospace" font-size="12">Create one enemy sprite source for a first-person party dungeon crawler.</text>
+    <rect x="32" y="404" width="1136" height="130" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
+    <rect x="48" y="422" width="170" height="104" fill="#09080d" stroke="#403848"/>
+    <image href="../../public/assets/drafts/underroot/batch-01/rootbitten-wolf-preview-01.png" x="94" y="422" width="78" height="104" image-rendering="pixelated"/>
+    <text x="250" y="432" fill="#d9c69a" font-family="monospace" font-size="18">Rootbitten Wolf</text>
+    <text x="250" y="454" fill="#b8aa91" font-family="monospace" font-size="13">enemy.root-wolf.placeholder</text>
+    <text x="250" y="474" fill="#6fb6b4" font-family="monospace" font-size="13">sprite / processed / 96x128</text>
+    <text x="250" y="496" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: silhouette, intent read, hit flash</text>
+    <text x="250" y="516" fill="#8b8174" font-family="monospace" font-size="12">Prompt: root-wolf-enemy.txt / Create one enemy sprite source for a first-person party dungeon crawler.</text>
   </g>
   <g>
-    <rect x="32" y="440" width="1136" height="92" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
-    <rect x="54" y="456" width="40" height="60" rx="4" fill="#252638" stroke="#d9a441"/><rect x="64" y="476" width="20" height="26" fill="#9f3341"/>
-    <text x="126" y="464" fill="#d9c69a" font-family="monospace" font-size="18">Blood Edge</text>
-    <text x="126" y="486" fill="#b8aa91" font-family="monospace" font-size="13">card.blood-edge.placeholder</text>
-    <text x="126" y="506" fill="#6fb6b4" font-family="monospace" font-size="13">card-art / placeholder / 64x48</text>
-    <text x="520" y="468" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: temptation, danger, crop safety</text>
-    <text x="520" y="490" fill="#8b8174" font-family="monospace" font-size="12">Prompt: blood-edge-card.txt</text>
-    <text x="520" y="510" fill="#8b8174" font-family="monospace" font-size="12">Create textless card art for a dark first-person dungeon-crawler deckbuilder.</text>
+    <rect x="32" y="554" width="1136" height="130" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
+    <rect x="48" y="572" width="170" height="104" fill="#09080d" stroke="#403848"/>
+    <image href="../../public/assets/drafts/underroot/batch-01/blood-edge-preview-01.png" x="64" y="572" width="139" height="104" image-rendering="pixelated"/>
+    <text x="250" y="582" fill="#d9c69a" font-family="monospace" font-size="18">Blood Edge</text>
+    <text x="250" y="604" fill="#b8aa91" font-family="monospace" font-size="13">card.blood-edge.placeholder</text>
+    <text x="250" y="624" fill="#6fb6b4" font-family="monospace" font-size="13">card-art / processed / 64x48</text>
+    <text x="250" y="646" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: temptation, danger, crop safety</text>
+    <text x="250" y="666" fill="#8b8174" font-family="monospace" font-size="12">Prompt: blood-edge-card.txt / Create textless card art for a dark first-person dungeon-crawler deckbuilder.</text>
   </g>
   <g>
-    <rect x="32" y="552" width="1136" height="92" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
-    <circle cx="74" cy="598" r="24" fill="#9f3341" stroke="#d9a441" stroke-width="3"/>
-    <text x="126" y="576" fill="#d9c69a" font-family="monospace" font-size="18">UI Ornaments</text>
-    <text x="126" y="598" fill="#b8aa91" font-family="monospace" font-size="13">ui.ornaments.placeholder</text>
-    <text x="126" y="618" fill="#6fb6b4" font-family="monospace" font-size="13">ui / placeholder / 1024x1024</text>
-    <text x="520" y="580" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: panel corners, status frames, palette restraint</text>
-    <text x="520" y="602" fill="#8b8174" font-family="monospace" font-size="12">Prompt: ui-ornaments.txt</text>
-    <text x="520" y="622" fill="#8b8174" font-family="monospace" font-size="12">Create a textless UI ornament sheet for a dark pixel-art dungeon RPG.</text>
+    <rect x="32" y="704" width="1136" height="130" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
+    <rect x="48" y="722" width="170" height="104" fill="#09080d" stroke="#403848"/>
+    <image href="../../public/assets/drafts/underroot/batch-01/ui-ornaments-preview-01.png" x="81" y="722" width="104" height="104" image-rendering="pixelated"/>
+    <text x="250" y="732" fill="#d9c69a" font-family="monospace" font-size="18">UI Ornaments</text>
+    <text x="250" y="754" fill="#b8aa91" font-family="monospace" font-size="13">ui.ornaments.placeholder</text>
+    <text x="250" y="774" fill="#6fb6b4" font-family="monospace" font-size="13">ui / processed / 1024x1024</text>
+    <text x="250" y="796" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: panel corners, status frames, palette restraint</text>
+    <text x="250" y="816" fill="#8b8174" font-family="monospace" font-size="12">Prompt: ui-ornaments.txt / Create a textless UI ornament sheet for a dark pixel-art dungeon RPG.</text>
   </g>
 </svg>

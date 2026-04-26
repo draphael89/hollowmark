@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { PLACEHOLDER_ASSETS } from '../src/assets/manifest';
 
 type AssetPassport = {
@@ -26,15 +26,17 @@ describe('asset production foundation', () => {
     expect(manifest.assets.map((asset) => asset.reviewFocus)).toEqual(PLACEHOLDER_ASSETS.map((asset) => asset.reviewFocus));
   });
 
-  it('keeps first-batch prompt files ready without raw generated assets', () => {
+  it('tracks first-batch source candidates without gameplay wiring', () => {
     const manifest = readAssetManifest();
 
     for (const asset of manifest.assets) {
-      expect(asset.approvalState).toBe('placeholder');
+      expect(asset.approvalState).toBe('processed');
       expect(asset.title.length).toBeGreaterThan(0);
       expect(asset.reviewFocus.length).toBeGreaterThan(0);
-      expect(asset.rawSource).toBeNull();
-      expect(asset.processedPath).toBeNull();
+      expect(asset.rawSource).toMatch(new RegExp('^\\.curation/raw/underroot/batch-01/.+\\.png$'));
+      expect(asset.processedPath).toMatch(new RegExp('^public/assets/drafts/underroot/batch-01/.+\\.png$'));
+      expect(existsSync(asset.rawSource!)).toBe(true);
+      expect(existsSync(asset.processedPath!)).toBe(true);
       expect(asset.finalSize.w).toBeGreaterThan(0);
       expect(asset.finalSize.h).toBeGreaterThan(0);
       const prompt = readFileSync(asset.promptPath, 'utf8');

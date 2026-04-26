@@ -8,6 +8,7 @@
     "dev": "vite",
     "asset:audit": "node scripts/audit-assets.mjs",
     "asset:contact-sheet": "node scripts/create-contact-sheet.mjs",
+    "asset:process-batch": "node scripts/process-underroot-batch.mjs",
     "test": "vitest run tests/*.test.ts",
     "test:browser": "playwright test",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",

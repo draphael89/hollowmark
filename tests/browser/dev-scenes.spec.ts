@@ -221,7 +221,7 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
     assetCount: 5,
     selectedId: 'underroot.corridor.placeholder',
     selectedKind: 'background',
-    selectedStatus: 'placeholder',
+    selectedStatus: 'processed',
     selectedReviewFocus: 'depth, tile read, no text',
   }));
   expect(debug.visualGallery?.stableIds).toEqual([

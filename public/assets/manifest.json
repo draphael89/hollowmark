@@ -9,15 +9,18 @@
       "promptPath": ".prompts/underroot/environment-plate.txt",
       "reviewFocus": "depth, tile read, no text",
       "sourceInputs": [],
-      "rawSource": null,
-      "processedPath": null,
-      "finalSize": { "w": 392, "h": 220 },
-      "palette": "placeholder",
-      "cropNotes": "First-person corridor plate target; no generated source yet.",
-      "matteOrMaskNotes": "Not applicable until source art exists.",
-      "humanEditNotes": "Placeholder swatch only.",
+      "rawSource": ".curation/raw/underroot/batch-01/underroot-corridor-draft-01.png",
+      "processedPath": "public/assets/drafts/underroot/batch-01/underroot-corridor-preview-01.png",
+      "finalSize": {
+        "w": 392,
+        "h": 220
+      },
+      "palette": "draft-generated",
+      "cropNotes": "Center-cropped and downsampled to 392x220. Strong depth read; possible pseudo-glyphs on side stones need human review before approval.",
+      "matteOrMaskNotes": "Not applicable for full plate.",
+      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "placeholder",
+      "approvalState": "processed",
       "rejectionNotes": null
     },
     {
@@ -28,15 +31,18 @@
       "promptPath": ".prompts/underroot/combat-background.txt",
       "reviewFocus": "enemy contrast, floor contact, no text",
       "sourceInputs": [],
-      "rawSource": null,
-      "processedPath": null,
-      "finalSize": { "w": 392, "h": 220 },
-      "palette": "placeholder",
-      "cropNotes": "Combat room plate target; no generated source yet.",
-      "matteOrMaskNotes": "Not applicable until source art exists.",
-      "humanEditNotes": "Placeholder swatch only.",
+      "rawSource": ".curation/raw/underroot/batch-01/underroot-combat-draft-01.png",
+      "processedPath": "public/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png",
+      "finalSize": {
+        "w": 392,
+        "h": 220
+      },
+      "palette": "draft-generated",
+      "cropNotes": "Center-cropped and downsampled to 392x220. Good enemy stage and floor contact read.",
+      "matteOrMaskNotes": "Not applicable for full plate.",
+      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "placeholder",
+      "approvalState": "processed",
       "rejectionNotes": null
     },
     {
@@ -47,15 +53,18 @@
       "promptPath": ".prompts/underroot/root-wolf-enemy.txt",
       "reviewFocus": "silhouette, intent read, hit flash",
       "sourceInputs": [],
-      "rawSource": null,
-      "processedPath": null,
-      "finalSize": { "w": 96, "h": 128 },
-      "palette": "placeholder",
-      "cropNotes": "Enemy sprite target; no generated source yet.",
-      "matteOrMaskNotes": "Dark matte removal planned after generation.",
-      "humanEditNotes": "Placeholder triangle only.",
+      "rawSource": ".curation/raw/underroot/batch-01/rootbitten-wolf-draft-01.png",
+      "processedPath": "public/assets/drafts/underroot/batch-01/rootbitten-wolf-preview-01.png",
+      "finalSize": {
+        "w": 96,
+        "h": 128
+      },
+      "palette": "draft-generated",
+      "cropNotes": "Downsampled to 96x128. Silhouette is strong; future matte pass must separate near-black background cleanly.",
+      "matteOrMaskNotes": "Raw source uses near-black matte, not transparency. Alpha extraction remains pending.",
+      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "placeholder",
+      "approvalState": "processed",
       "rejectionNotes": null
     },
     {
@@ -66,15 +75,18 @@
       "promptPath": ".prompts/underroot/blood-edge-card.txt",
       "reviewFocus": "temptation, danger, crop safety",
       "sourceInputs": [],
-      "rawSource": null,
-      "processedPath": null,
-      "finalSize": { "w": 64, "h": 48 },
-      "palette": "placeholder",
-      "cropNotes": "Card art target; no generated source yet.",
-      "matteOrMaskNotes": "Not applicable until source art exists.",
-      "humanEditNotes": "Placeholder card swatch only.",
+      "rawSource": ".curation/raw/underroot/batch-01/blood-edge-draft-01.png",
+      "processedPath": "public/assets/drafts/underroot/batch-01/blood-edge-preview-01.png",
+      "finalSize": {
+        "w": 64,
+        "h": 48
+      },
+      "palette": "draft-generated",
+      "cropNotes": "Center-cropped and downsampled to 64x48. Blade reads at tiny size; abstract wall marks must be checked for accidental text.",
+      "matteOrMaskNotes": "Not applicable for card crop.",
+      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "placeholder",
+      "approvalState": "processed",
       "rejectionNotes": null
     },
     {
@@ -85,16 +97,19 @@
       "promptPath": ".prompts/underroot/ui-ornaments.txt",
       "reviewFocus": "panel corners, status frames, palette restraint",
       "sourceInputs": [],
-      "rawSource": null,
-      "processedPath": null,
-      "finalSize": { "w": 1024, "h": 1024 },
-      "palette": "placeholder",
-      "cropNotes": "Ornament sheet source target; slices not selected yet.",
-      "matteOrMaskNotes": "Dark matte separation planned after generation.",
-      "humanEditNotes": "Placeholder ring only.",
+      "rawSource": ".curation/raw/underroot/batch-01/ui-ornaments-draft-01.png",
+      "processedPath": "public/assets/drafts/underroot/batch-01/ui-ornaments-preview-01.png",
+      "finalSize": {
+        "w": 1024,
+        "h": 1024
+      },
+      "palette": "draft-generated",
+      "cropNotes": "Center-cropped to 1024x1024 for preview. Source is strong but landscape; final UI slicing should return to raw source or request square composition.",
+      "matteOrMaskNotes": "Dark matte separation remains pending.",
+      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "placeholder",
-      "rejectionNotes": null
+      "approvalState": "processed",
+      "rejectionNotes": "Needs square-sheet or deliberate slicing pass before approval."
     }
   ]
 }
