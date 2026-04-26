@@ -44,6 +44,12 @@ for (const asset of manifest.assets) {
   if (!existsSync(asset.promptPath)) {
     throw new Error(`${asset.id} promptPath does not exist: ${asset.promptPath}`);
   }
+  if (asset.rawSource && !existsSync(asset.rawSource)) {
+    throw new Error(`${asset.id} rawSource does not exist: ${asset.rawSource}`);
+  }
+  if (asset.processedPath && !existsSync(asset.processedPath)) {
+    throw new Error(`${asset.id} processedPath does not exist: ${asset.processedPath}`);
+  }
 }
 
 console.log(`Asset manifest OK: ${manifest.assets.length} assets`);

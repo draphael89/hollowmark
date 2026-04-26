@@ -15,13 +15,14 @@ describe('placeholder asset manifest', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('keeps placeholder entries as review contracts, not raw asset paths', () => {
+  it('keeps draft entries as review contracts, not gameplay asset paths', () => {
     for (const asset of PLACEHOLDER_ASSETS) {
-      expect(asset.status).toBe('placeholder');
+      expect(asset.status).toBe('processed');
       expect(asset.id).toMatch(/^[a-z0-9.-]+\.placeholder$/);
       expect(asset.title.length).toBeGreaterThan(0);
       expect(asset.reviewFocus.length).toBeGreaterThan(0);
-      expect(Object.keys(asset).sort()).toEqual(['id', 'kind', 'reviewFocus', 'status', 'title']);
+      expect(asset.previewPath).toMatch(/^\/assets\/drafts\/underroot\/batch-01\/.+\.png$/);
+      expect(Object.keys(asset).sort()).toEqual(['id', 'kind', 'previewPath', 'reviewFocus', 'status', 'title']);
     }
   });
 });

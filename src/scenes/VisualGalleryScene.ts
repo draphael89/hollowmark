@@ -16,10 +16,17 @@ export class VisualGalleryScene extends Phaser.Scene {
   private cardsGfx!: Phaser.GameObjects.Graphics;
   private detailTitle!: Phaser.GameObjects.Text;
   private detailBody!: Phaser.GameObjects.Text;
+  private previewImages: Phaser.GameObjects.Image[] = [];
   private selectedIndex = 0;
 
   constructor() {
     super('VisualGalleryScene');
+  }
+
+  preload(): void {
+    for (const asset of PLACEHOLDER_ASSETS) {
+      this.load.image(asset.id, asset.previewPath);
+    }
   }
 
   create(): void {
@@ -75,17 +82,26 @@ export class VisualGalleryScene extends Phaser.Scene {
 
   private drawCards(): void {
     this.cardsGfx.clear();
+    this.previewImages.forEach((image) => image.destroy());
+    this.previewImages = [];
     PLACEHOLDER_ASSETS.forEach((asset, index) => {
       const x = 42 + (index % 2) * 286;
       const y = 62 + Math.floor(index / 2) * CARD_GAP_Y;
       const selected = index === this.selectedIndex;
       this.cardsGfx.fillStyle(colors.panelDeep, 1).fillRect(x, y, CARD_W, CARD_H);
       this.cardsGfx.lineStyle(selected ? 2 : 1, selected ? colors.gold : colors.stoneLight, 1).strokeRect(x, y, CARD_W, CARD_H);
-      this.drawAssetSwatch(asset.kind, x + 36, y + 38);
+      this.drawAssetPreview(asset, x + 36, y + 38);
     });
   }
 
-  private drawAssetSwatch(kind: (typeof PLACEHOLDER_ASSETS)[number]['kind'], x: number, y: number): void {
+  private drawAssetPreview(asset: (typeof PLACEHOLDER_ASSETS)[number], x: number, y: number): void {
+    if (this.textures.exists(asset.id)) {
+      const image = this.add.image(x, y, asset.id);
+      image.setDisplaySize(...previewSize(asset.kind));
+      this.previewImages.push(image);
+      return;
+    }
+    const kind = asset.kind;
     if (kind === 'background') {
       this.cardsGfx.fillStyle(colors.stone, 1).fillRect(x - 24, y - 22, 48, 44);
       this.cardsGfx.fillStyle(colors.moss, 0.8).fillRect(x - 18, y - 6, 36, 6);
@@ -113,6 +129,7 @@ export class VisualGalleryScene extends Phaser.Scene {
     this.detailBody.setText([
       asset.id,
       `${asset.kind} / ${asset.status}`,
+      asset.previewPath,
       `Review: ${asset.reviewFocus}`,
     ]);
   }
@@ -130,6 +147,13 @@ export class VisualGalleryScene extends Phaser.Scene {
       },
     });
   }
+}
+
+function previewSize(kind: (typeof PLACEHOLDER_ASSETS)[number]['kind']): [number, number] {
+  if (kind === 'background') return [70, 40];
+  if (kind === 'sprite') return [34, 46];
+  if (kind === 'card-art') return [54, 40];
+  return [46, 46];
 }
 
 function compactAssetId(id: string): string {

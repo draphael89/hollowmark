@@ -14,7 +14,7 @@ const rows = await Promise.all(manifest.assets.map(async (asset, index) => {
   return row(asset, prompt, index);
 }));
 
-const height = 94 + rows.length * 112;
+const height = 94 + rows.length * 150;
 const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="${height}" viewBox="0 0 1200 ${height}">
   <rect width="1200" height="${height}" fill="#09080d"/>
@@ -29,17 +29,29 @@ await writeFile(outPath, svg);
 console.log(`Contact sheet written: ${outPath.pathname}`);
 
 function row(asset, prompt, index) {
-  const y = 104 + index * 112;
+  const y = 104 + index * 150;
   return `  <g>
-    <rect x="32" y="${y}" width="1136" height="92" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
-    ${swatch(asset.kind, 74, y + 46)}
-    <text x="126" y="${y + 24}" fill="#d9c69a" font-family="monospace" font-size="18">${escapeXml(asset.title)}</text>
-    <text x="126" y="${y + 46}" fill="#b8aa91" font-family="monospace" font-size="13">${escapeXml(asset.id)}</text>
-    <text x="126" y="${y + 66}" fill="#6fb6b4" font-family="monospace" font-size="13">${escapeXml(asset.kind)} / ${escapeXml(asset.approvalState)} / ${escapeXml(asset.finalSize.w)}x${escapeXml(asset.finalSize.h)}</text>
-    <text x="520" y="${y + 28}" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: ${escapeXml(asset.reviewFocus)}</text>
-    <text x="520" y="${y + 50}" fill="#8b8174" font-family="monospace" font-size="12">Prompt: ${escapeXml(basename(asset.promptPath))}</text>
-    <text x="520" y="${y + 70}" fill="#8b8174" font-family="monospace" font-size="12">${escapeXml(firstPromptLine(prompt))}</text>
+    <rect x="32" y="${y}" width="1136" height="130" rx="0" fill="#14111a" stroke="#702231" stroke-width="2"/>
+    ${preview(asset, 48, y + 18)}
+    <text x="250" y="${y + 28}" fill="#d9c69a" font-family="monospace" font-size="18">${escapeXml(asset.title)}</text>
+    <text x="250" y="${y + 50}" fill="#b8aa91" font-family="monospace" font-size="13">${escapeXml(asset.id)}</text>
+    <text x="250" y="${y + 70}" fill="#6fb6b4" font-family="monospace" font-size="13">${escapeXml(asset.kind)} / ${escapeXml(asset.approvalState)} / ${escapeXml(asset.finalSize.w)}x${escapeXml(asset.finalSize.h)}</text>
+    <text x="250" y="${y + 92}" fill="#e0d4bd" font-family="monospace" font-size="14">Focus: ${escapeXml(asset.reviewFocus)}</text>
+    <text x="250" y="${y + 112}" fill="#8b8174" font-family="monospace" font-size="12">Prompt: ${escapeXml(basename(asset.promptPath))} / ${escapeXml(firstPromptLine(prompt))}</text>
   </g>`;
+}
+
+function preview(asset, x, y) {
+  if (!asset.processedPath) return swatch(asset.kind, x + 74, y + 56);
+  const href = asset.processedPath.startsWith('public/') ? `../../${asset.processedPath}` : asset.processedPath.replace('.curation/', '../');
+  const size = fit(asset.finalSize.w, asset.finalSize.h, 170, 104);
+  return `<rect x="${x}" y="${y}" width="170" height="104" fill="#09080d" stroke="#403848"/>
+    <image href="${escapeXml(href)}" x="${x + Math.round((170 - size.w) / 2)}" y="${y + Math.round((104 - size.h) / 2)}" width="${size.w}" height="${size.h}" image-rendering="pixelated"/>`;
+}
+
+function fit(width, height, maxW, maxH) {
+  const scale = Math.min(maxW / width, maxH / height);
+  return { w: Math.round(width * scale), h: Math.round(height * scale) };
 }
 
 function swatch(kind, x, y) {
