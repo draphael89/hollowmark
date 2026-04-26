@@ -1,5 +1,4 @@
-import type { FloorId } from '../../game/types';
-import type { FloorDef } from '../../systems/floor';
+import type { FloorDef, FloorId } from '../../game/types';
 import { S0_FLOOR } from './s0';
 
 const floors = {

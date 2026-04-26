@@ -4,11 +4,13 @@ import { getInitialFeelSettings, planFeelCues, type FeelCue, type FeelSettings, 
 import { GAME_HEIGHT, GAME_WIDTH, S0_LAYOUT, SIDE_PANEL, TRAY, VIEWPORT } from '../game/layout';
 import { MOTION } from '../game/motion';
 import { THEME } from '../game/theme';
-import type { CardDef, CardInstanceId, GameEvent, HeroId, HeroState, SliceCommand, SliceState } from '../game/types';
-import { cardDefFor, renderIntentText } from '../systems/combat';
+import type { CardDef, CardInstanceId, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId } from '../game/types';
+import { M1_STARTER_CARDS } from '../data/combat';
+import { cardDefFor, createCombatWithCards, renderIntentText } from '../systems/combat';
 import { floorForId } from '../data/floors';
 import { deserializeSave, serializeSave } from '../systems/save';
 import { applyCommand, createSliceState } from '../systems/slice';
+import { emptyStatusStacks, hasStatus, statusRule, statusSummary } from '../systems/status';
 import { computeViewSlots, viewSlot } from '../systems/viewSlots';
 
 declare global {
@@ -23,6 +25,8 @@ declare global {
       pendingEvents: number;
       state: SliceState;
       selectedCardId: CardInstanceId | null;
+      selectedCardHint: string | null;
+      selectedStatusRule: string | null;
       intentText: string | null;
       feelSettings: FeelSettings;
       lastEvents: readonly GameEvent[];
@@ -35,6 +39,7 @@ const text = THEME.text;
 const textStyle = THEME.textStyle;
 const layout = S0_LAYOUT;
 const SAVE_KEY = 'hollowmark:s0-save';
+const M1_COMBAT_SEED = 'm1-natural-19';
 
 export class S0Scene extends Phaser.Scene {
   private state = createSliceState();
@@ -58,7 +63,7 @@ export class S0Scene extends Phaser.Scene {
   }
 
   create() {
-    this.state = loadSavedState();
+    this.state = initialStateForLocation(window.location);
     this.buildViews();
     this.input.keyboard?.on('keydown-W', () => this.dispatch({ type: 'step-forward' }));
     this.input.keyboard?.on('keydown-UP', () => this.dispatch({ type: 'step-forward' }));
@@ -99,7 +104,7 @@ export class S0Scene extends Phaser.Scene {
     const result = applyCommand(this.state, command);
     this.state = result.state;
     this.lastEvents = result.events;
-    persistState(this.state);
+    if (!isM1CombatRoute(window.location)) persistState(this.state);
 
     if (command.type === 'play-card') {
       this.selectedCardId = null;
@@ -113,13 +118,13 @@ export class S0Scene extends Phaser.Scene {
 
   private restartRun(): void {
     if (this.state.mode !== 'victory' && this.state.mode !== 'defeat') return;
-    clearSavedState();
+    if (!isM1CombatRoute(window.location)) clearSavedState();
     this.eventScheduler.reset();
     this.fx.clear(true, true);
     this.time.timeScale = 1;
     this.hitStopUntil = 0;
     this.selectedCardId = null;
-    this.state = createSliceState();
+    this.state = initialStateForLocation(window.location);
     this.syncFromState();
   }
 
@@ -248,7 +253,7 @@ export class S0Scene extends Phaser.Scene {
     );
 
     const combat = this.assertCombat();
-    const enemyTint = combat.enemy.marked ? colors.gold : colors.oxblood;
+    const enemyTint = hasStatus(combat.enemy.statuses, 'mark') ? colors.gold : colors.oxblood;
     g.fillStyle(colors.wolfShadow, 1).fillEllipse(
       combatLayout.enemyShadow.x,
       combatLayout.enemyShadow.y,
@@ -275,6 +280,8 @@ export class S0Scene extends Phaser.Scene {
 
     this.label(combat.enemy.name, combatLayout.enemyName.x, combatLayout.enemyName.y, text.gold);
     this.label(`${combat.enemy.hp}/${combat.enemy.maxHp} HP`, combatLayout.enemyHp.x, combatLayout.enemyHp.y);
+    const enemyStatuses = statusSummary(combat.enemy.statuses);
+    if (enemyStatuses) this.label(enemyStatuses, combatLayout.enemyStatus.x, combatLayout.enemyStatus.y, text.gold);
     this.label(renderIntentText(combat.enemy.intent), combatLayout.enemyIntent.x, combatLayout.enemyIntent.y, text.red);
     if (this.state.mode === 'combat') {
       this.zone(combatLayout.enemyHitBox.x, combatLayout.enemyHitBox.y, combatLayout.enemyHitBox.w, combatLayout.enemyHitBox.h, () => this.playSelected());
@@ -345,10 +352,10 @@ export class S0Scene extends Phaser.Scene {
     const combat = this.state.combat;
     const side = layout.sidePanel;
     const heroes = combat?.heroes ?? [
-      { id: 'liese', name: 'Liese', role: 'Warrior', hp: 31, maxHp: 31, block: 0, debt: 0 },
-      { id: 'eris', name: 'Eris', role: 'Priest', hp: 24, maxHp: 24, block: 0, debt: 0 },
-      { id: 'mia', name: 'Mia', role: 'Mage', hp: 20, maxHp: 20, block: 0, debt: 0 },
-      { id: 'robin', name: 'Robin', role: 'Ranger', hp: 23, maxHp: 23, block: 0, debt: 0 },
+      { id: 'liese', name: 'Liese', role: 'Warrior', hp: 31, maxHp: 31, block: 0, debt: 0, statuses: emptyStatusStacks() },
+      { id: 'eris', name: 'Eris', role: 'Priest', hp: 24, maxHp: 24, block: 0, debt: 0, statuses: emptyStatusStacks() },
+      { id: 'mia', name: 'Mia', role: 'Mage', hp: 20, maxHp: 20, block: 0, debt: 0, statuses: emptyStatusStacks() },
+      { id: 'robin', name: 'Robin', role: 'Ranger', hp: 23, maxHp: 23, block: 0, debt: 0, statuses: emptyStatusStacks() },
     ];
 
     this.label('MINIMAP', side.title.x, side.title.y, text.gold);
@@ -394,6 +401,8 @@ export class S0Scene extends Phaser.Scene {
     this.label(`${hero.hp}/${hero.maxHp}`, side.heroHpText.x, y + side.heroHpText.yOffset);
     this.label(`Blk ${hero.block}`, side.heroBlock.x, y + side.heroBlock.yOffset, text.cyan);
     this.label(`Debt ${hero.debt}`, side.heroDebt.x, y + side.heroDebt.yOffset, hero.debt > 0 ? text.gold : text.mutedBone);
+    const statuses = statusSummary(hero.statuses);
+    if (statuses) this.label(statuses, side.heroStatus.x, y + side.heroStatus.yOffset, text.gold);
   }
 
   private drawFooter() {
@@ -413,11 +422,23 @@ export class S0Scene extends Phaser.Scene {
       this.label(`${threat}     W/S step     A/D turn     Space interact`, layout.footer.label.x, layout.footer.label.y, this.state.threat === 'hunted' ? text.gold : text.mutedBone);
       return;
     }
-    const selected =
-      this.selectedCardId && this.state.combat
-        ? `Selected ${cardDefFor(this.state.combat, this.selectedCardId).name}     ${this.targetHint(cardDefFor(this.state.combat, this.selectedCardId))}`
-        : 'Select card, click enemy/Hold, or T/Enter to end turn';
+    const selected = this.selectedCardHint();
     this.label(`${threat}     ${selected}`, layout.footer.label.x, layout.footer.label.y, this.state.threat === 'hunted' ? text.gold : text.mutedBone);
+  }
+
+  private selectedCardHint(): string {
+    if (!this.selectedCardId || !this.state.combat) return 'Select card, click enemy/Hold, or T/Enter to end turn';
+    const card = cardDefFor(this.state.combat, this.selectedCardId);
+    const rule = this.selectedStatusRule();
+    const statusHint = rule ? `     ${rule}` : '';
+    return `Selected ${card.name}     ${this.targetHint(card)}${statusHint}`;
+  }
+
+  private selectedStatusRule(): string | null {
+    if (!this.selectedCardId || !this.state.combat) return null;
+    const card = cardDefFor(this.state.combat, this.selectedCardId);
+    const statusEffect = card.effects.find((effect) => effect.type === 'apply-status');
+    return statusEffect ? statusRule(statusEffect.status) : null;
   }
 
   private panel(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number) {
@@ -604,6 +625,8 @@ export class S0Scene extends Phaser.Scene {
       pendingEvents: this.eventScheduler.getPendingCount(),
       state: this.state,
       selectedCardId: this.selectedCardId,
+      selectedCardHint: this.selectedCardId ? this.selectedCardHint() : null,
+      selectedStatusRule: this.selectedStatusRule(),
       intentText: this.state.combat ? renderIntentText(this.state.combat.enemy.intent) : null,
       feelSettings: this.feelSettings,
       lastEvents: this.lastEvents,
@@ -641,6 +664,23 @@ function heroCode(heroId: HeroId): string {
   return 'ROB';
 }
 
+function initialStateForLocation(location: Pick<Location, 'search'>): SliceState {
+  if (!isM1CombatRoute(location)) return loadSavedState();
+  const state = createSliceState(M1_COMBAT_SEED);
+  return {
+    ...state,
+    mode: 'combat',
+    position: { x: 1, y: 1 },
+    threat: 'hunted',
+    combat: createCombatWithCards(M1_COMBAT_SEED, M1_STARTER_CARDS),
+    log: ['M1 starter combat lab.'],
+  };
+}
+
+function isM1CombatRoute(location: Pick<Location, 'search'>): boolean {
+  return new URLSearchParams(location.search).get('scene') === 'm1-combat';
+}
+
 function targetCode(card: CardDef): string {
   return card.target.type === 'enemy' ? 'EN' : 'OWN';
 }
@@ -656,8 +696,17 @@ function cardSummary(card: CardDef): string {
   if (damage) return `Deal ${damage.amount}`;
   if (block) return `Block ${block.amount}`;
   if (heal) return `Heal ${heal.amount}`;
-  if (status) return 'Apply Mark';
+  if (status) return `Apply ${statusName(status.status)}`;
   return card.text.split('\n')[0] ?? '';
+}
+
+function statusName(status: StatusId): string {
+  if (status === 'poison') return 'Poison';
+  if (status === 'bleed') return 'Bleed';
+  if (status === 'weak') return 'Weak';
+  if (status === 'vulnerable') return 'Vuln';
+  if (status === 'mark') return 'Mark';
+  return 'Ward';
 }
 
 function loadSavedState(): SliceState {

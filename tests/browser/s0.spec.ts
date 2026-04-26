@@ -14,6 +14,8 @@ declare global {
       pendingEvents: number;
       state: SliceState;
       selectedCardId: CardInstanceId | null;
+      selectedCardHint: string | null;
+      selectedStatusRule: string | null;
       intentText: string | null;
       feelSettings: FeelSettings;
       lastEvents: readonly GameEvent[];
@@ -83,7 +85,7 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
   await page.keyboard.press('Enter');
   await waitForFxDrain(page);
   await expectDebugState(page, (state) => {
-    expect(state.combat?.enemy.marked).toBe(true);
+    expect(state.combat?.enemy.statuses.mark).toBe(1);
   });
 
   await selectCardByDef(page, 'blood-edge');
@@ -152,6 +154,88 @@ test('S0 browser smoke: repeated end turns drain FX and render defeat', async ({
   expect(pageErrors).toEqual([]);
 });
 
+test('M1 browser smoke: seeded starter route plays a natural 24-card win', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m1-combat');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('combat');
+    expect(state.seed).toBe('m1-natural-19');
+    expect(state.combat?.hand).toHaveLength(5);
+    expect(state.combat?.drawPile).toHaveLength(19);
+    expect(state.combat?.hand.map((cardId) => state.combat?.cards[cardId]?.defId)).toEqual([
+      'ringing-blow',
+      'blood-edge',
+      'shadow-mark',
+      'quiet-rebuke',
+      'iron-cut',
+    ]);
+  });
+
+  await selectCardByDef(page, 'shadow-mark');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'blood-edge');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'iron-cut');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('victory');
+    expect(state.combat?.enemy.hp).toBe(0);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'mia')?.debt).toBe(4);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'robin')?.debt).toBe(1);
+    expect(state.commandLog.map((command) => command.type)).toEqual(['play-card', 'play-card', 'play-card']);
+  });
+  expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
+
+  await page.goto('/');
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.seed).toBe('s0-root-wolf');
+    expect(state.combat).toBeNull();
+  });
+  expect(pageErrors).toEqual([]);
+});
+
+test('M1 browser smoke: natural route survives an enemy turn and refills', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m1-combat');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await selectCardByDef(page, 'ringing-blow');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('combat');
+    expect(state.combat?.turn).toBe(1);
+    expect(state.combat?.energy).toBe(3);
+    expect(state.combat?.hand).toHaveLength(5);
+    expect(state.combat?.drawPile).toHaveLength(14);
+    expect(state.combat?.discardPile).toHaveLength(5);
+    expect(state.combat?.enemy.hp).toBe(18);
+    expect(state.combat?.enemy.statuses.weak).toBe(0);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'liese')?.hp).toBe(27);
+    expect(state.lastEvents.map((event) => event.type)).toContain('HAND_REFILLED');
+  });
+  expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
+  expect(pageErrors).toEqual([]);
+});
+
 test('S0 browser smoke: clicking the enemy plays a selected attack', async ({ page }) => {
   await startFresh(page);
   const canvas = page.locator('canvas');
@@ -202,11 +286,32 @@ test('S0 browser smoke: owner-target cards emit their owner target', async ({ pa
   await page.keyboard.press('Space');
 
   await selectCardByDef(page, 'mend');
+  await canvas.click();
   await page.keyboard.press('Enter');
 
-  await expect.poll(async () => cardPlayedTarget(await getDebugState(page))).toEqual({ kind: 'hero', id: 'eris' });
+  await expect.poll(async () => {
+    const state = await getDebugState(page);
+    return {
+      selected: state.selectedCardId,
+      target: cardPlayedTarget(state),
+    };
+  }).toEqual({ selected: null, target: { kind: 'hero', id: 'eris' } });
+});
+
+test('S0 browser smoke: status card selection exposes a readable rule hint', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  await selectCardByDef(page, 'mark-prey');
+
   await expectDebugState(page, (state) => {
-    expect(state.selectedCardId).toBeNull();
+    expect(state.selectedCardHint).toContain('Selected Mark Prey');
+    expect(state.selectedCardHint).toContain('Mark adds burst damage');
+    expect(state.selectedStatusRule).toBe('Mark adds burst damage');
   });
 });
 
@@ -225,7 +330,7 @@ test('S0 browser smoke: reload restores mid-combat save and can finish', async (
   await waitForFxDrain(page);
   await expectDebugState(page, (state) => {
     expect(state.mode).toBe('combat');
-    expect(state.combat?.enemy.marked).toBe(true);
+    expect(state.combat?.enemy.statuses.mark).toBe(1);
   });
 
   await page.reload();
@@ -234,7 +339,7 @@ test('S0 browser smoke: reload restores mid-combat save and can finish', async (
     expect(state.mode).toBe('combat');
     expect(state.floorId).toBe('s0-root-wolf-hallway');
     expect(state.position).toEqual({ x: 1, y: 1 });
-    expect(state.combat?.enemy.marked).toBe(true);
+    expect(state.combat?.enemy.statuses.mark).toBe(1);
     expect(state.combat?.energy).toBe(2);
   });
 
@@ -314,6 +419,8 @@ type DebugState = {
   };
   pendingEvents: number;
   selectedCardId: CardInstanceId | null;
+  selectedCardHint: string | null;
+  selectedStatusRule: string | null;
   feelSettings: FeelSettings;
   lastEvents: readonly GameEvent[];
 };
@@ -327,6 +434,8 @@ async function getDebugState(page: Page): Promise<SliceState & DebugState> {
     objectCounts: debug.objectCounts,
     pendingEvents: debug.pendingEvents,
     selectedCardId: debug.selectedCardId,
+    selectedCardHint: debug.selectedCardHint,
+    selectedStatusRule: debug.selectedStatusRule,
     feelSettings: debug.feelSettings,
     lastEvents: debug.lastEvents,
   };

@@ -41,6 +41,45 @@ describe('feel scheduler', () => {
     expect(cues).toContainEqual({ type: 'float-text', target: 'liese', text: 'blocked', tone: 'blocked', scale: 'normal', priority: 1 });
   });
 
+  it('gives consumed Ward a distinct legible cue', () => {
+    const cues = planFeelCues({
+      type: 'STATUS_CONSUMED',
+      status: 'ward',
+      target: { kind: 'hero', id: 'liese' },
+      prevented: 6,
+    });
+
+    expect(cues.map((cue) => cue.type)).toEqual(['hit-stop', 'float-text', 'tone']);
+    expect(cues).toContainEqual({ type: 'float-text', target: 'liese', text: 'warded', tone: 'blocked', scale: 'normal', priority: 1 });
+  });
+
+  it('gives applied statuses their own readable cue', () => {
+    const cues = planFeelCues({
+      type: 'STATUS_APPLIED',
+      status: 'poison',
+      amount: 2,
+      total: 2,
+      source: { kind: 'hero', id: 'mia' },
+      target: { kind: 'enemy', id: 'root-wolf' },
+    });
+
+    expect(cues.map((cue) => cue.type)).toEqual(['float-text', 'tone']);
+    expect(cues).toContainEqual({ type: 'float-text', target: 'enemy', text: '+Poison', tone: 'damage', scale: 'normal', priority: 1 });
+  });
+
+  it('gives applied Ward a protective cue tone', () => {
+    const cues = planFeelCues({
+      type: 'STATUS_APPLIED',
+      status: 'ward',
+      amount: 1,
+      total: 1,
+      source: { kind: 'hero', id: 'liese' },
+      target: { kind: 'hero', id: 'liese' },
+    });
+
+    expect(cues).toContainEqual({ type: 'float-text', target: 'liese', text: '+Ward', tone: 'blocked', scale: 'normal', priority: 1 });
+  });
+
   it('keeps debt distinct from safe damage', () => {
     const cues = planFeelCues({ type: 'DEBT_GAINED', heroId: 'mia', amount: 4, total: 4, source: { kind: 'hero', id: 'mia' } });
 

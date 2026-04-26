@@ -61,6 +61,30 @@ describe('mode-safe slice reducer', () => {
     expect(result.events.at(-1)).toEqual({ type: 'DEFEAT' });
   });
 
+  it('transitions to victory when poison kills the enemy during end turn', () => {
+    let state = createSliceState();
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'interact' }).state;
+    state = {
+      ...state,
+      combat: {
+        ...state.combat!,
+        enemy: {
+          ...state.combat!.enemy,
+          hp: 1,
+          statuses: { ...state.combat!.enemy.statuses, poison: 1 },
+        },
+      },
+    };
+
+    const result = applyCommand(state, { type: 'end-turn' });
+
+    expect(result.state.mode).toBe('victory');
+    expect(result.state.combat?.enemy.hp).toBe(0);
+    expect(result.events.at(-1)).toEqual({ type: 'VICTORY' });
+  });
+
   it('rejects invalid explicit combat targets through the slice boundary', () => {
     let state = createSliceState();
     state = applyCommand(state, { type: 'step-forward' }).state;

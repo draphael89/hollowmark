@@ -149,6 +149,17 @@ function playCombatCard(state: SliceState, command: Extract<CombatCommand, { typ
 
 function endCombatTurn(state: SliceState): CommandResult {
   const result = endTurn(assertCombat(state));
+  if (result.events.some((event) => event.type === 'VICTORY')) {
+    return {
+      state: {
+        ...state,
+        mode: 'victory',
+        combat: result.combat,
+        log: [...state.log, ...result.combat.log.slice(-3), 'Replay saved in the command log.'],
+      },
+      events: result.events,
+    };
+  }
   if (result.events.some((event) => event.type === 'DEFEAT')) {
     return {
       state: {

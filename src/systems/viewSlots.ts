@@ -1,6 +1,5 @@
-import type { Facing, ThreatBand, TileCoord } from '../game/types';
+import type { Facing, FloorDef, FloorTile, ThreatBand, TileCoord } from '../game/types';
 import { addCoord, turnFacing, vectorForFacing } from './direction';
-import type { FloorDef, FloorTile } from './floor';
 import { tileAt } from './floor';
 
 export type ViewSlotId = 'current' | 'front' | 'left' | 'right';

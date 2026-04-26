@@ -1,6 +1,7 @@
 import { BLOCKED_FEEL, DAMAGE_BANDS, damageBandFor, DEBT_FEEL } from '../game/feelCalibration';
 import { MOTION } from '../game/motion';
 import type { GameEvent, HeroId } from '../game/types';
+import { statusName } from '../systems/status';
 
 export type FeelSettings = Readonly<{
   reducedMotion: boolean;
@@ -58,6 +59,19 @@ function cuesForEvent(event: GameEvent): readonly FeelCue[] {
   }
 
   if (event.type === 'DAMAGE_DEALT') return damageCues(event);
+  if (event.type === 'STATUS_APPLIED') {
+    return [
+      { type: 'float-text', target: feelTargetFor(event.target), text: `+${statusName(event.status)}`, tone: event.status === 'ward' ? 'blocked' : 'damage', scale: 'normal', priority: 1 },
+      { type: 'tone', tone: { frequencyHz: event.status === 'ward' ? BLOCKED_FEEL.toneHz : MOTION.audio.facingToneHz, durationMs: MOTION.fx.turnToneMs }, priority: 2 },
+    ];
+  }
+  if (event.type === 'STATUS_CONSUMED' && event.status === 'ward') {
+    return [
+      { type: 'hit-stop', durationMs: BLOCKED_FEEL.hitStopMs, priority: 1 },
+      { type: 'float-text', target: feelTargetFor(event.target), text: 'warded', tone: 'blocked', scale: 'normal', priority: 1 },
+      { type: 'tone', tone: { frequencyHz: BLOCKED_FEEL.toneHz, durationMs: BLOCKED_FEEL.toneMs }, priority: 1 },
+    ];
+  }
   if (event.type === 'DEBT_GAINED') {
     return [
       { type: 'hit-stop', durationMs: DEBT_FEEL.hitStopMs, priority: 1 },
@@ -90,10 +104,10 @@ function damageCues(event: Extract<GameEvent, { type: 'DAMAGE_DEALT' }>): readon
   ];
 }
 
-function feelTargetFor(target: Extract<GameEvent, { type: 'DAMAGE_DEALT' }>['target']): FeelTarget {
+function feelTargetFor(target: Extract<GameEvent, { type: 'DAMAGE_DEALT' | 'STATUS_CONSUMED' | 'STATUS_APPLIED' }>['target']): FeelTarget {
   if (target.kind === 'enemy') return 'enemy';
   if (target.kind === 'hero') return target.id;
-  throw new Error('Damage target must be a hero or enemy');
+  throw new Error('Feel target must be a hero or enemy');
 }
 
 function keepCue(cue: FeelCue, settings: FeelSettings): boolean {

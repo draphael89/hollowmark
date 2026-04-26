@@ -1,4 +1,4 @@
-import type { FloorDef } from '../../systems/floor';
+import type { FloorDef } from '../../game/types';
 
 export const S0_FLOOR: FloorDef = {
   id: 's0-root-wolf-hallway',

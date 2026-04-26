@@ -48,10 +48,6 @@ export function frontTile(state: SliceState): TileCoord {
   };
 }
 
-export function isWalkable(coord: TileCoord): boolean {
-  return isFloorWalkable(START_FLOOR, coord);
-}
-
 function withLog(state: SliceState, line: string): SliceState {
   return {
     ...state,

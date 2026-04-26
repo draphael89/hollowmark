@@ -1,14 +1,27 @@
 import Phaser from 'phaser';
+import { M1_STARTER_CARDS } from '../data/combat';
 import { planFeelCues, type FeelCue } from '../fx/feelScheduler';
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/layout';
 import { MOTION } from '../game/motion';
 import { THEME } from '../game/theme';
-import type { GameEvent } from '../game/types';
+import type { CardId, CombatEvent, CombatState, GameEvent } from '../game/types';
+import { cardDefFor, createCombatWithCards, endTurn, firstCardInstanceId, holdCard, playCard } from '../systems/combat';
+import { stageCardInHandForLab } from '../systems/labCombat';
+import { statusLegend, statusSummary } from '../systems/status';
 import { publishDevSceneDebug } from './devSceneDebug';
 
 const colors = THEME.color;
 const text = THEME.text;
 const textStyle = THEME.textStyle;
+const SANDBOX_EVENT_STAGGER_MS = 120;
+const SANDBOX_ENEMY_X = 304;
+const HAND_SLOT_HITBOXES = [
+  { x: 78, y: 114, w: 58, h: 18 },
+  { x: 140, y: 114, w: 58, h: 18 },
+  { x: 202, y: 114, w: 58, h: 18 },
+  { x: 78, y: 132, w: 58, h: 18 },
+  { x: 140, y: 132, w: 58, h: 18 },
+] as const;
 
 type CueButton = Readonly<{
   key: string;
@@ -28,8 +41,14 @@ const cues: readonly CueButton[] = [
 export class CombatSandboxScene extends Phaser.Scene {
   private fx!: Phaser.GameObjects.Group;
   private statusLabel!: Phaser.GameObjects.Text;
+  private deckLabel!: Phaser.GameObjects.Text;
+  private selectedSlot = 0;
   private audioContext: AudioContext | null = null;
   private lastCue = 'ready';
+  private lastEvents: string[] = [];
+  private deckSeedIndex = 0;
+  private labCombat: CombatState = createCombatWithCards('sandbox-m1-0', M1_STARTER_CARDS);
+  private floatLane = 0;
 
   constructor() {
     super('CombatSandboxScene');
@@ -41,18 +60,111 @@ export class CombatSandboxScene extends Phaser.Scene {
     cues.forEach((cue) => {
       this.input.keyboard?.on(`keydown-${cue.key}`, () => this.trigger(cue));
     });
+    this.input.keyboard?.on('keydown-SEVEN', () => this.previewNextDeck());
+    this.input.keyboard?.on('keydown-EIGHT', () => this.playFirstLabCard());
+    this.input.keyboard?.on('keydown-NINE', () => this.endLabTurn());
+    this.input.keyboard?.on('keydown-ZERO', () => this.previewStatusStack());
+    this.input.keyboard?.on('keydown-H', () => this.holdFirstLabCard());
+    ['Q', 'W', 'E', 'R', 'T'].forEach((key, index) => {
+      this.input.keyboard?.on(`keydown-${key}`, () => this.selectLabSlot(index));
+    });
+    this.input.keyboard?.on('keydown-ENTER', () => this.playSelectedLabCard());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.audioContext?.close();
       this.audioContext = null;
     });
-    publishDevSceneDebug(this, 'combat-sandbox', this.lastCue);
+    this.publishDebug();
   }
 
   private trigger(cue: CueButton): void {
     this.lastCue = cue.label;
+    this.floatLane = 0;
     this.statusLabel.setText(`Last: ${this.lastCue}`);
     for (const feelCue of planFeelCues(cue.event)) this.playFeelCue(feelCue);
-    publishDevSceneDebug(this, 'combat-sandbox', this.lastCue);
+    this.lastEvents = [cue.event.type];
+    this.publishDebug();
+  }
+
+  private previewNextDeck(): void {
+    this.deckSeedIndex += 1;
+    this.labCombat = createCombatWithCards(`sandbox-m1-${this.deckSeedIndex}`, M1_STARTER_CARDS);
+    const preview = m1DeckPreview(this.labCombat);
+    this.lastCue = `7 ${preview.seed}`;
+    this.statusLabel.setText(`Last: ${this.lastCue}`);
+    this.selectedSlot = 0;
+    this.refreshDeckLabel();
+    this.lastEvents = [];
+    this.publishDebug();
+  }
+
+  private playFirstLabCard(): void {
+    this.playLabCardAt(0);
+  }
+
+  private selectLabSlot(index: number): void {
+    if (!this.labCombat.hand[index]) return;
+    this.selectedSlot = index;
+    const card = cardDefFor(this.labCombat, this.labCombat.hand[index]!);
+    this.lastCue = `${slotKey(index)} ${card.name}`;
+    this.statusLabel.setText(`Last: selected ${card.name}`);
+    this.refreshDeckLabel();
+    this.publishDebug();
+  }
+
+  private playSelectedLabCard(): void {
+    this.playLabCardAt(this.selectedSlot);
+  }
+
+  private playLabCardAt(index: number): void {
+    const cardId = this.labCombat.hand[index];
+    if (!cardId) return;
+    const card = cardDefFor(this.labCombat, cardId);
+    const result = playCard(this.labCombat, cardId);
+    this.labCombat = result.combat;
+    this.selectedSlot = Math.min(index, Math.max(0, this.labCombat.hand.length - 1));
+    this.applyLabResult(`${slotKey(index)} ${card.name}`, result.events);
+  }
+
+  private holdFirstLabCard(): void {
+    const cardId = this.labCombat.hand[0];
+    if (!cardId) return;
+    const card = cardDefFor(this.labCombat, cardId);
+    const result = holdCard(this.labCombat, cardId);
+    this.labCombat = result.combat;
+    this.selectedSlot = 0;
+    this.applyLabResult(`H ${card.name}`, result.events);
+  }
+
+  private endLabTurn(): void {
+    const result = endTurn(this.labCombat);
+    this.labCombat = result.combat;
+    this.selectedSlot = 0;
+    this.applyLabResult('9 End turn', result.events);
+  }
+
+  private previewStatusStack(): void {
+    this.labCombat = createCombatWithCards('sandbox-m1-status', M1_STARTER_CARDS);
+    const events: CombatEvent[] = [];
+    for (const defId of ['oath-ward', 'rootfire', 'barbed-shot'] as const) {
+      this.labCombat = stageCardInHandForLab(this.labCombat, defId);
+      const cardId = firstCardInstanceId(this.labCombat, defId);
+      if (!cardId) throw new Error(`Missing sandbox card ${defId}`);
+      const result = playCard(this.labCombat, cardId);
+      this.labCombat = result.combat;
+      events.push(...result.events);
+    }
+    this.selectedSlot = 0;
+    this.applyLabResult('0 Status stack', events);
+  }
+
+  private applyLabResult(label: string, events: readonly CombatEvent[]): void {
+    this.lastCue = label;
+    this.floatLane = 0;
+    this.lastEvents = events.map(eventLabel).slice(-10);
+    this.statusLabel.setText(`Last: ${this.lastCue}`);
+    this.refreshDeckLabel();
+    this.playCombatEvents(events);
+    this.publishDebug();
   }
 
   private drawShell(): void {
@@ -61,13 +173,62 @@ export class CombatSandboxScene extends Phaser.Scene {
     g.fillStyle(colors.panel, 1).fillRect(16, 16, 608, 328);
     g.lineStyle(2, colors.oxblood, 1).strokeRect(16, 16, 608, 328);
     g.fillStyle(colors.combatVoid, 1).fillRect(38, 50, 360, 190);
-    g.fillStyle(colors.oxblood, 1).fillTriangle(168, 180, 218, 90, 268, 180);
-    g.fillStyle(colors.gold, 1).fillCircle(204, 132, 4).fillCircle(232, 132, 4);
+    g.fillStyle(colors.oxblood, 1).fillTriangle(SANDBOX_ENEMY_X - 50, 180, SANDBOX_ENEMY_X, 90, SANDBOX_ENEMY_X + 50, 180);
+    g.fillStyle(colors.gold, 1).fillCircle(SANDBOX_ENEMY_X - 14, 132, 4).fillCircle(SANDBOX_ENEMY_X + 14, 132, 4);
     g.fillStyle(colors.panelDeep, 1).fillRect(424, 50, 174, 190);
 
     this.label('Combat Sandbox', 32, 28, text.gold);
     cues.forEach((cue, index) => this.label(cue.label, 440, 66 + index * 22, text.bone));
+    this.label('7 M1 deck', 440, 66 + cues.length * 22, text.cyan);
+    this.label('8 Play first', 440, 66 + (cues.length + 1) * 22, text.cyan);
+    this.label('9 End turn', 440, 66 + (cues.length + 2) * 22, text.cyan);
+    this.label('Q-T play hand', 440, 66 + (cues.length + 3) * 22, text.cyan);
+    this.label('H Hold first', 440, 66 + (cues.length + 4) * 22, text.cyan);
+    this.label('0 Status stack', 440, 66 + (cues.length + 5) * 22, text.cyan);
+    this.deckLabel = this.add.text(44, 64, deckPreviewText(m1DeckPreview(this.labCombat), this.labCombat, this.selectedSlot), { ...textStyle, color: text.bone, lineSpacing: 4 });
     this.statusLabel = this.add.text(32, 260, `Last: ${this.lastCue}`, { ...textStyle, color: text.cyan });
+    HAND_SLOT_HITBOXES.forEach((box, index) => {
+      this.add.zone(box.x, box.y, box.w, box.h)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.selectLabSlot(index));
+    });
+  }
+
+  private refreshDeckLabel(): void {
+    this.deckLabel.setText(deckPreviewText(m1DeckPreview(this.labCombat), this.labCombat, this.selectedSlot));
+  }
+
+  private publishDebug(): void {
+    const preview = m1DeckPreview(this.labCombat);
+    publishDevSceneDebug(this, 'combat-sandbox', this.lastCue, {
+      combatSandbox: {
+        seed: preview.seed,
+        hand: preview.hand,
+        drawPilePreview: preview.drawPile.slice(0, 5),
+        drawPileCount: this.labCombat.drawPile.length,
+        discardPileCount: this.labCombat.discardPile.length,
+        held: this.labCombat.held ? cardDefFor(this.labCombat, this.labCombat.held).id : null,
+        enemyHp: this.labCombat.enemy.hp,
+        enemyStatuses: statusSummary(this.labCombat.enemy.statuses),
+        enemyStatusStacks: this.labCombat.enemy.statuses,
+        heroDebt: Object.fromEntries(this.labCombat.heroes.map((hero) => [hero.id, hero.debt])),
+        heroStatuses: Object.fromEntries(this.labCombat.heroes.map((hero) => [hero.id, hero.statuses])),
+        statusLegend: statusLegend(),
+        lastEvents: this.lastEvents,
+        selectedCard: selectedCardDebug(this.labCombat, this.selectedSlot),
+      },
+    });
+  }
+
+  private playCombatEvent(event: CombatEvent): void {
+    for (const feelCue of planFeelCues(event)) this.playFeelCue(feelCue);
+  }
+
+  private playCombatEvents(events: readonly CombatEvent[]): void {
+    events.forEach((event, index) => {
+      this.time.delayedCall(index * SANDBOX_EVENT_STAGGER_MS, () => this.playCombatEvent(event));
+    });
   }
 
   private playFeelCue(cue: FeelCue): void {
@@ -81,18 +242,22 @@ export class CombatSandboxScene extends Phaser.Scene {
       return;
     }
     if (cue.type === 'float-text') {
-      this.float(cue.text, cue.target === 'enemy' ? 218 : 510, cue.target === 'debt' ? 170 : 118, cue.tone === 'debt' ? text.red : text.gold);
+      this.float(cue.text, cue.target === 'enemy' ? SANDBOX_ENEMY_X : 510, cue.target === 'debt' ? 170 : 118, cue.tone === 'debt' ? text.red : text.gold);
       return;
     }
     if (cue.type === 'tone') this.tone(cue.tone.frequencyHz, cue.tone.durationMs);
   }
 
   private float(labelText: string, x: number, y: number, color: string): void {
-    const label = this.add.text(x, y, labelText, { ...textStyle, color, fontSize: MOTION.text.largeFloatFontSize });
+    const lane = this.floatLane;
+    this.floatLane = (this.floatLane + 1) % 5;
+    const laneX = x + (lane % 2 === 0 ? 0 : 22);
+    const laneY = y - lane * 12;
+    const label = this.add.text(laneX, laneY, labelText, { ...textStyle, color, fontSize: MOTION.text.largeFloatFontSize });
     this.fx.add(label);
     this.tweens.add({
       targets: label,
-      y: y + MOTION.text.floatDriftY,
+      y: laneY + MOTION.text.floatDriftY,
       alpha: 0,
       duration: MOTION.fx.damageFloatMs,
       ease: 'Cubic.easeOut',
@@ -128,4 +293,114 @@ function damage(amount: number): Extract<GameEvent, { type: 'DAMAGE_DEALT' }> {
     lethal: false,
     tags: ['physical'],
   };
+}
+
+type DeckPreview = Readonly<{
+  seed: string;
+  hand: readonly CardId[];
+  drawPile: readonly CardId[];
+}>;
+
+function m1DeckPreview(combat: CombatState): DeckPreview {
+  return {
+    seed: combat.seed,
+    hand: combat.hand.map((cardId) => cardDefFor(combat, cardId).id),
+    drawPile: combat.drawPile.map((cardId) => cardDefFor(combat, cardId).id),
+  };
+}
+
+function deckPreviewText(preview: DeckPreview, combat: CombatState, selectedSlot: number): string {
+  return [
+    'M1 starter lab',
+    `Seed ${preview.seed}`,
+    `Energy ${combat.energy}/3  Held ${combat.held ? shortCardName(cardDefFor(combat, combat.held).id) : '-'}`,
+    ...cardListLines('Hand', preview.hand, 3, selectedSlot),
+    ...cardListLines('Draw', preview.drawPile.slice(0, 5), 3),
+    `Draw +${Math.max(0, preview.drawPile.length - 5)} more  Discard ${combat.discardPile.length}`,
+    `Wolf ${combat.enemy.hp}/${combat.enemy.maxHp} ${statusSummary(combat.enemy.statuses) || '-'}`,
+    `Debt ${combat.heroes.map((hero) => `${hero.name[0]}${hero.debt}`).join(' ')}`,
+    selectedHandDetail(combat, selectedSlot),
+    `Status ${compactStatusLegend()}`,
+  ].join('\n');
+}
+
+function cardListLines(label: string, cardIds: readonly CardId[], maxFirstLine: number, selectedSlot: number | null = null): string[] {
+  const names = cardIds.map((cardId, index) => `${selectedSlot === index ? '>' : ''}${shortCardName(cardId)}`);
+  if (names.length <= maxFirstLine) return [`${label} ${names.join(' / ')}`];
+  return [
+    `${label} ${names.slice(0, maxFirstLine).join(' / ')}`,
+    `     ${names.slice(maxFirstLine).join(' / ')}`,
+  ];
+}
+
+function slotKey(index: number): string {
+  return ['Q', 'W', 'E', 'R', 'T'][index] ?? '8';
+}
+
+function eventLabel(event: CombatEvent): string {
+  if (event.type === 'CARD_PLAYED') return `play:${event.defId}`;
+  if (event.type === 'DAMAGE_DEALT') return `damage:${event.amount}`;
+  if (event.type === 'STATUS_APPLIED') return `status:${event.status}+${event.amount}`;
+  if (event.type === 'DEBT_GAINED') return `debt:${event.heroId}+${event.amount}`;
+  if (event.type === 'CARD_HELD') return `hold:${event.defId}`;
+  if (event.type === 'CARD_REJECTED') return `reject:${event.reason}`;
+  return event.type.toLowerCase();
+}
+
+function shortCardName(cardId: CardId): string {
+  if (cardId === 'iron-cut') return 'Iron';
+  if (cardId === 'hold-fast') return 'Hold';
+  if (cardId === 'mend') return 'Mend';
+  if (cardId === 'mark-prey') return 'Mark';
+  if (cardId === 'blood-edge') return 'Blood';
+  if (cardId === 'oath-ward') return 'Oath';
+  if (cardId === 'sundering-cut') return 'Sunder';
+  if (cardId === 'sanctuary-veil') return 'Veil';
+  if (cardId === 'quiet-rebuke') return 'Rebuke';
+  if (cardId === 'glass-hex') return 'Glass';
+  if (cardId === 'rootfire') return 'Rootfire';
+  if (cardId === 'barbed-shot') return 'Barb';
+  if (cardId === 'stone-guard') return 'Stone';
+  if (cardId === 'ringing-blow') return 'Ring';
+  if (cardId === 'white-thread') return 'Thread';
+  if (cardId === 'mercy-cut') return 'Mercy';
+  if (cardId === 'prayer-knot') return 'Prayer';
+  if (cardId === 'black-spark') return 'Spark';
+  if (cardId === 'venom-script') return 'Venom';
+  if (cardId === 'glass-pulse') return 'Pulse';
+  if (cardId === 'shadow-mark') return 'S.Mark';
+  if (cardId === 'needle-rain') return 'Needle';
+  if (cardId === 'marked-step') return 'Step';
+  if (cardId === 'tripwire') return 'Trip';
+  return assertNever(cardId);
+}
+
+function selectedHandDetail(combat: CombatState, selectedSlot: number): string {
+  const cardId = combat.hand[selectedSlot];
+  if (!cardId) return `${slotKey(selectedSlot)} -`;
+  const card = cardDefFor(combat, cardId);
+  return `${slotKey(selectedSlot)} ${shortCardName(card.id)} ${card.name} c${card.cost} ${card.owner} ${card.target.type}\n   ${card.text.replaceAll('\n', ' / ')}`;
+}
+
+function selectedCardDebug(combat: CombatState, selectedSlot: number) {
+  const cardId = combat.hand[selectedSlot];
+  if (!cardId) return null;
+  const card = cardDefFor(combat, cardId);
+  return {
+    slot: slotKey(selectedSlot),
+    id: card.id,
+    name: card.name,
+    owner: card.owner,
+    cost: card.cost,
+    target: card.target.type,
+    text: card.text,
+  };
+}
+
+function compactStatusLegend(): string {
+  return statusLegend().map((entry) => entry.split(':')[0]).join(' / ');
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unexpected card id: ${value}`);
 }

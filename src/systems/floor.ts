@@ -1,22 +1,4 @@
-import type { Facing, FloorId, ThreatBand, TileCoord } from '../game/types';
-
-export type TilePurpose = 'start' | 'approach' | 'encounter' | 'side-path';
-
-export type FloorTile = Readonly<{
-  coord: TileCoord;
-  walkable: boolean;
-  threat: ThreatBand;
-  purpose: TilePurpose;
-  logLine: string;
-  visual: 'stone-hall' | 'root-arch' | 'side-passage';
-}>;
-
-export type FloorDef = Readonly<{
-  id: FloorId;
-  start: TileCoord;
-  startFacing: Facing;
-  tiles: readonly FloorTile[];
-}>;
+import type { FloorDef, FloorTile, ThreatBand, TileCoord } from '../game/types';
 
 export function tileKey(coord: TileCoord): string {
   return `${coord.x},${coord.y}`;

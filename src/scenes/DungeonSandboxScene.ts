@@ -25,6 +25,10 @@ export class DungeonSandboxScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-S', () => this.step(-1));
     this.input.keyboard?.on('keydown-A', () => this.turn('left'));
     this.input.keyboard?.on('keydown-D', () => this.turn('right'));
+    this.input.keyboard?.on('keydown-ONE', () => this.setPose(S0_FLOOR.start, S0_FLOOR.startFacing));
+    this.input.keyboard?.on('keydown-TWO', () => this.setPose({ x: 1, y: 2 }, 'north'));
+    this.input.keyboard?.on('keydown-THREE', () => this.setPose({ x: 1, y: 1 }, 'east'));
+    this.input.keyboard?.on('keydown-FOUR', () => this.setPose({ x: 2, y: 1 }, 'west'));
     this.draw();
   }
 
@@ -40,6 +44,12 @@ export class DungeonSandboxScene extends Phaser.Scene {
     this.draw();
   }
 
+  private setPose(position: TileCoord, facing: Facing): void {
+    this.position = position;
+    this.facing = facing;
+    this.draw();
+  }
+
   private draw(): void {
     this.children.removeAll(true);
     const g = this.add.graphics();
@@ -48,6 +58,7 @@ export class DungeonSandboxScene extends Phaser.Scene {
     g.lineStyle(2, colors.oxblood, 1).strokeRect(16, 16, 608, 328);
     this.label('Dungeon Sandbox', 32, 28, text.gold);
     this.label(`Facing ${this.facing.toUpperCase()}  ${this.position.x},${this.position.y}`, 32, 48, text.cyan);
+    this.label('W/S step  A/D turn  1-4 review poses', 278, 48, text.mutedBone);
 
     S0_FLOOR.tiles.forEach((tile) => {
       const x = 82 + tile.coord.x * 34;
@@ -67,12 +78,32 @@ export class DungeonSandboxScene extends Phaser.Scene {
     slots.forEach((slot, index) => {
       const y = 96 + index * 32;
       const color = slot.walkable ? text.bone : text.red;
-      this.label(`${slot.id}: ${slot.coord.x},${slot.coord.y} ${slot.threat}`, 348, y, color);
+      this.label(`${slot.id}: ${coordLabel(slot.coord)} ${slot.threat}`, 348, y, color);
+      this.label(slot.tile?.purpose ?? 'wall', 492, y, slot.tile ? text.mutedBone : text.red);
     });
-    publishDevSceneDebug(this, 'dungeon-sandbox', `${this.position.x},${this.position.y}:${this.facing}`);
+    const current = slots[0];
+    publishDevSceneDebug(this, 'dungeon-sandbox', `${coordLabel(this.position)}:${this.facing}`, {
+      dungeonSandbox: {
+        floorId: S0_FLOOR.id,
+        position: coordLabel(this.position),
+        facing: this.facing,
+        currentPurpose: current?.tile?.purpose ?? 'wall',
+        slots: slots.map((slot) => ({
+          id: slot.id,
+          coord: coordLabel(slot.coord),
+          walkable: slot.walkable,
+          threat: slot.threat,
+          purpose: slot.tile?.purpose ?? null,
+        })),
+      },
+    });
   }
 
   private label(value: string, x: number, y: number, color: string): void {
     this.add.text(x, y, value, { ...textStyle, color });
   }
+}
+
+function coordLabel(coord: TileCoord): string {
+  return `${coord.x},${coord.y}`;
 }

@@ -1,4 +1,5 @@
-import { isFloorId } from '../data/floors';
+import { floorForId, isFloorId } from '../data/floors';
+import { ALL_CARDS } from '../data/combat';
 import {
   cardInstanceId,
   type CardId,
@@ -16,10 +17,14 @@ import {
   type SliceCommand,
   type SliceMode,
   type SliceState,
+  type StatusId,
+  type StatusStacks,
   type TargetRef,
   type ThreatBand,
   type TileCoord,
 } from '../game/types';
+import { isFloorWalkable, threatAt } from './floor';
+import { emptyStatusStacks, isStatusId, STATUS_IDS } from './status';
 
 export const SAVE_VERSION = 1;
 
@@ -36,7 +41,7 @@ const facings = ['north', 'east', 'south', 'west'] as const satisfies readonly F
 const modes = ['explore', 'combat', 'victory', 'defeat'] as const satisfies readonly SliceMode[];
 const threats = ['calm', 'uneasy', 'hunted'] as const satisfies readonly ThreatBand[];
 const heroes = ['liese', 'eris', 'mia', 'robin'] as const satisfies readonly HeroId[];
-const cards = ['iron-cut', 'hold-fast', 'mend', 'mark-prey', 'blood-edge'] as const satisfies readonly CardId[];
+const cards = ALL_CARDS.map((card) => card.id) satisfies readonly CardId[];
 
 export function serializeSave(state: SliceState): SaveV1 {
   return { version: SAVE_VERSION, state };
@@ -64,12 +69,19 @@ function parseSliceState(value: unknown): SliceState | null {
   if (!isCoord(value.position)) return null;
   if (!isOneOf(value.facing, facings)) return null;
   if (!isOneOf(value.threat, threats)) return null;
+  const floor = floorForId(floorId);
+  if (!isFloorWalkable(floor, value.position)) return null;
+  if (threatAt(floor, value.position) !== value.threat) return null;
   if (!isStringArray(value.log)) return null;
   const commandLog = parseCommands(value.commandLog);
   if (!commandLog) return null;
   const combat = value.combat === null ? null : parseCombat(value.combat);
   if (combat === undefined) return null;
+  if (value.mode === 'explore' && combat) return null;
   if (value.mode !== 'explore' && !combat) return null;
+  if (combat && !modeMatchesCombat(value.mode, combat)) return null;
+  if (combat && !intentMatchesMode(value.mode, combat)) return null;
+  if (combat && !commandLogReferencesKnownCards(commandLog, combat)) return null;
 
   return {
     seed: value.seed,
@@ -84,9 +96,34 @@ function parseSliceState(value: unknown): SliceState | null {
   };
 }
 
+function intentMatchesMode(mode: SliceMode, combat: CombatState): boolean {
+  if (mode !== 'combat') return true;
+  return combat.heroes.some((hero) => hero.id === combat.enemy.intent.target && hero.hp > 0);
+}
+
+function commandLogReferencesKnownCards(commandLog: readonly SliceCommand[], combat: CombatState): boolean {
+  const known = new Set(Object.keys(combat.cards));
+  return commandLog.every((command) => {
+    if (command.type !== 'hold-card' && command.type !== 'play-card') return true;
+    if (!known.has(command.cardId)) return false;
+    if (command.type === 'play-card' && command.target?.kind === 'enemy') return command.target.id === combat.enemy.id;
+    return true;
+  });
+}
+
+function modeMatchesCombat(mode: SliceMode, combat: CombatState): boolean {
+  const enemyDead = combat.enemy.hp === 0;
+  const partyDead = combat.heroes.every((hero) => hero.hp === 0);
+  if (enemyDead && partyDead) return false;
+  if (mode === 'combat') return !enemyDead && !partyDead;
+  if (mode === 'victory') return enemyDead;
+  if (mode === 'defeat') return partyDead;
+  return false;
+}
+
 function parseCombat(value: unknown): CombatState | undefined {
   if (!isRecord(value)) return undefined;
-  if (!isNumber(value.turn) || !isString(value.seed) || !isNumber(value.energy)) return undefined;
+  if (!isNonNegativeInteger(value.turn) || !isString(value.seed) || !isCombatEnergy(value.energy)) return undefined;
   const heroStates = parseHeroes(value.heroes);
   if (!heroStates) return undefined;
   const enemy = parseEnemy(value.enemy);
@@ -94,6 +131,7 @@ function parseCombat(value: unknown): CombatState | undefined {
   const cardInstances = parseCards(value.cards);
   if (!cardInstances) return undefined;
   const cardIds = new Set(Object.keys(cardInstances));
+  if (cardIds.size === 0) return undefined;
   const drawPile = parseCardIds(value.drawPile, cardIds);
   const hand = parseCardIds(value.hand, cardIds);
   const discardPile = parseCardIds(value.discardPile, cardIds);
@@ -101,7 +139,7 @@ function parseCombat(value: unknown): CombatState | undefined {
   const held = value.held === null ? null : parseCardId(value.held, cardIds);
   if (held === undefined) return undefined;
   if (!isStringArray(value.log)) return undefined;
-  if (!hasUniqueZoneCards(drawPile, hand, discardPile, held)) return undefined;
+  if (!hasExactZoneCards(cardIds, drawPile, hand, discardPile, held)) return undefined;
 
   return {
     turn: value.turn,
@@ -118,7 +156,8 @@ function parseCombat(value: unknown): CombatState | undefined {
   };
 }
 
-function hasUniqueZoneCards(
+function hasExactZoneCards(
+  known: ReadonlySet<string>,
   drawPile: readonly CardInstanceId[],
   hand: readonly CardInstanceId[],
   discardPile: readonly CardInstanceId[],
@@ -129,21 +168,30 @@ function hasUniqueZoneCards(
     if (seen.has(cardId)) return false;
     seen.add(cardId);
   }
-  return true;
+  return seen.size === known.size;
 }
 
 function parseHeroes(value: unknown): HeroState[] | null {
   if (!Array.isArray(value)) return null;
   const parsed = value.map(parseHero);
   if (parsed.some((hero) => !hero)) return null;
-  return parsed as HeroState[];
+  const roster = parsed as HeroState[];
+  if (roster.length !== heroes.length) return null;
+  const ids = new Set(roster.map((hero) => hero.id));
+  if (ids.size !== heroes.length) return null;
+  if (!heroes.every((hero) => ids.has(hero))) return null;
+  return roster;
 }
 
 function parseHero(value: unknown): HeroState | null {
   if (!isRecord(value)) return null;
   if (!isOneOf(value.id, heroes)) return null;
   if (!isString(value.name) || !isString(value.role)) return null;
-  if (!isNumber(value.hp) || !isNumber(value.maxHp) || !isNumber(value.block) || !isNumber(value.debt)) return null;
+  if (!isPositiveInteger(value.maxHp)) return null;
+  if (!isBoundedHp(value.hp, value.maxHp)) return null;
+  if (!isNonNegativeInteger(value.block) || !isNonNegativeInteger(value.debt)) return null;
+  const statuses = parseStatuses(value.statuses);
+  if (!statuses) return null;
   return {
     id: value.id,
     name: value.name,
@@ -152,13 +200,20 @@ function parseHero(value: unknown): HeroState | null {
     maxHp: value.maxHp,
     block: value.block,
     debt: value.debt,
+    statuses,
   };
 }
 
 function parseEnemy(value: unknown): EnemyState | null {
   if (!isRecord(value)) return null;
   if (!isString(value.id) || !isString(value.name)) return null;
-  if (!isNumber(value.hp) || !isNumber(value.maxHp) || !isNumber(value.block) || !isBoolean(value.marked)) return null;
+  if (!isPositiveInteger(value.maxHp)) return null;
+  if (!isBoundedHp(value.hp, value.maxHp)) return null;
+  if (!isNonNegativeInteger(value.block)) return null;
+  const statuses = value.statuses === undefined
+    ? parseLegacyMark(value.marked) ?? emptyStatusStacks()
+    : parseStatuses(value.statuses);
+  if (!statuses) return null;
   const intent = parseIntent(value.intent);
   if (!intent) return null;
   return {
@@ -167,14 +222,37 @@ function parseEnemy(value: unknown): EnemyState | null {
     hp: value.hp,
     maxHp: value.maxHp,
     block: value.block,
-    marked: value.marked,
+    statuses,
     intent,
+  };
+}
+
+function parseStatuses(value: unknown): StatusStacks | null {
+  if (value === undefined) return emptyStatusStacks();
+  if (!isRecord(value)) return null;
+  const statuses: Record<StatusId, number> = { ...emptyStatusStacks() };
+  for (const key of Object.keys(value)) {
+    if (!isStatusId(key)) return null;
+  }
+  for (const status of STATUS_IDS) {
+    const amount = value[status];
+    if (!isNumber(amount) || !Number.isInteger(amount) || amount < 0) return null;
+    statuses[status] = amount;
+  }
+  return statuses;
+}
+
+function parseLegacyMark(value: unknown): StatusStacks | null {
+  if (!isBoolean(value)) return null;
+  return {
+    ...emptyStatusStacks(),
+    mark: value ? 1 : 0,
   };
 }
 
 function parseIntent(value: unknown): EnemyIntent | null {
   if (!isRecord(value)) return null;
-  if (value.type !== 'attack' || !isOneOf(value.target, heroes) || !isNumber(value.amount)) return null;
+  if (value.type !== 'attack' || !isOneOf(value.target, heroes) || !isPositiveInteger(value.amount)) return null;
   return { type: 'attack', target: value.target, amount: value.amount };
 }
 
@@ -254,6 +332,22 @@ function isString(value: unknown): value is string {
 
 function isNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
+function isCombatEnergy(value: unknown): value is number {
+  return isNonNegativeInteger(value) && value <= 3;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value) && value > 0;
+}
+
+function isBoundedHp(value: unknown, maxHp: number): value is number {
+  return isNonNegativeInteger(value) && value <= maxHp;
 }
 
 function isBoolean(value: unknown): value is boolean {

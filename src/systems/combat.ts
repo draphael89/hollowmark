@@ -1,4 +1,4 @@
-import { ROOT_WOLF, S0_CARDS, S0_HEROES } from '../data/combat';
+import { ALL_CARDS, ROOT_WOLF, S0_CARDS, S0_HEROES } from '../data/combat';
 import {
   cardInstanceId,
   type ActorRef,
@@ -9,22 +9,33 @@ import {
   type CombatEvent,
   type CombatState,
   type EnemyIntent,
+  type EnemyState,
   type HeroId,
   type HeroState,
   type TargetRef,
 } from '../game/types';
+import { addStatus, consumeStatus, emptyStatusStacks, hasStatus, spendStatus } from './status';
 
 export function createCombat(seed: string): CombatState {
-  const cards = createCardInstances(seed);
-  const openingHand = Object.values(cards).map((card) => card.id);
+  return createCombatState(seed, S0_CARDS, false);
+}
+
+export function createCombatWithCards(seed: string, deck: readonly CardDef[]): CombatState {
+  return createCombatState(seed, deck, true);
+}
+
+function createCombatState(seed: string, deck: readonly CardDef[], shuffle: boolean): CombatState {
+  const cards = createCardInstances(seed, deck);
+  const deckIds = Object.values(cards).map((card) => card.id);
+  const orderedDeckIds = shuffle ? shuffleCardIds(deckIds, seed) : deckIds;
   return {
     turn: 0,
     seed,
     heroes: S0_HEROES.map((hero) => createHero(hero.id, hero.name, hero.role, hero.maxHp)),
-    enemy: { ...ROOT_WOLF },
+    enemy: { ...ROOT_WOLF, statuses: { ...ROOT_WOLF.statuses } },
     cards,
-    drawPile: [],
-    hand: openingHand,
+    hand: orderedDeckIds.slice(0, 5),
+    drawPile: orderedDeckIds.slice(5),
     discardPile: [],
     held: null,
     energy: 3,
@@ -121,7 +132,7 @@ function resolveCardEffects(combat: CombatState, cardId: CardInstanceId, card: C
   const events: CombatEvent[] = [cardPlayed(cardId, card, target)];
 
   for (const effect of card.effects) {
-    const result = applyCardEffect(next, cardId, card, effect);
+    const result = applyCardEffect(next, cardId, card, target, effect);
     next = result.combat;
     events.push(...result.events);
   }
@@ -145,12 +156,13 @@ function applyCardEffect(
   combat: CombatState,
   cardId: CardInstanceId,
   card: CardDef,
+  target: TargetRef,
   effect: CardEffect,
 ): { combat: CombatState; events: CombatEvent[] } {
-  if (effect.type === 'damage') return applyDamageEffect(combat, cardId, card, effect);
-  if (effect.type === 'gain-block') return applyBlockEffect(combat, cardId, card, effect);
-  if (effect.type === 'heal') return applyHealEffect(combat, cardId, card, effect);
-  if (effect.type === 'apply-status') return applyStatusEffect(combat, cardId, card, effect);
+  if (effect.type === 'damage') return applyDamageEffect(combat, cardId, card, target, effect);
+  if (effect.type === 'gain-block') return applyBlockEffect(combat, cardId, card, target, effect);
+  if (effect.type === 'heal') return applyHealEffect(combat, cardId, card, target, effect);
+  if (effect.type === 'apply-status') return applyStatusEffect(combat, cardId, card, target, effect);
   if (effect.type === 'gain-debt') return applyDebtEffect(combat, cardId, card, effect);
   return assertNever(effect);
 }
@@ -159,24 +171,41 @@ function applyDamageEffect(
   combat: CombatState,
   cardId: CardInstanceId,
   card: CardDef,
+  targetRef: TargetRef,
   effect: Extract<CardEffect, { type: 'damage' }>,
 ): { combat: CombatState; events: CombatEvent[] } {
-  const markBonus = combat.enemy.marked ? 4 : 0;
-  const rawDamage = effect.amount + markBonus;
-  const blocked = Math.min(rawDamage, combat.enemy.block);
-  const damage = rawDamage - blocked;
+  const targetEnemy = enemyTarget(combat, targetRef);
+  const sourceHero = heroById(combat.heroes, card.owner);
+  const weak = hasStatus(sourceHero.statuses, 'weak');
+  const marked = hasStatus(targetEnemy.statuses, 'mark');
+  const vulnerable = hasStatus(targetEnemy.statuses, 'vulnerable');
+  const weakDamage = weak ? weakAmount(effect.amount) : effect.amount;
+  const rawDamage = vulnerableAmount(weakDamage + (marked ? 4 : 0), vulnerable);
+  const blocked = Math.min(rawDamage, targetEnemy.block);
+  const hitDamage = rawDamage - blocked;
+  const bleedDamage = hitDamage > 0 && effect.tags.includes('physical') ? targetEnemy.statuses.bleed : 0;
+  const damage = hitDamage + bleedDamage;
   const source = heroRef(card.owner);
-  const target = enemyRef(combat);
+  const target = actorRefForTarget(targetRef);
   const enemy = {
-    ...combat.enemy,
-    hp: Math.max(0, combat.enemy.hp - damage),
-    block: combat.enemy.block - blocked,
-    marked: false,
+    ...targetEnemy,
+    hp: Math.max(0, targetEnemy.hp - damage),
+    block: targetEnemy.block - blocked,
+    statuses: spendIncomingDamageStatuses(targetEnemy.statuses, bleedDamage > 0),
   };
-  const tags = [...effect.tags, ...(markBonus > 0 ? ['mark' as const] : [])] as const;
+  const tags = [
+    ...effect.tags,
+    ...(weak ? ['weak' as const] : []),
+    ...(marked ? ['mark' as const] : []),
+    ...(vulnerable ? ['vulnerable' as const] : []),
+    ...(bleedDamage > 0 ? ['bleed' as const] : []),
+  ] as const;
+  const heroes = weak
+    ? combat.heroes.map((hero) => (hero.id === card.owner ? { ...hero, statuses: spendStatus(hero.statuses, 'weak') } : hero))
+    : combat.heroes;
 
   return {
-    combat: { ...combat, enemy },
+    combat: { ...combat, heroes, enemy },
     events: [{
       type: 'DAMAGE_DEALT',
       source,
@@ -193,18 +222,31 @@ function applyDamageEffect(
 
 export function endTurn(combat: CombatState): { combat: CombatState; events: CombatEvent[] } {
   const events: CombatEvent[] = [{ type: 'ENEMY_TURN_STARTED' }];
-  const bitten = applyEnemyIntent(combat);
-  const cleared = clearHeroBlocks(bitten.combat);
-
-  if (cleared.heroes.every((hero) => hero.hp === 0)) {
+  const enemyPoisoned = applyPoisonToEnemy(combat);
+  events.push(...enemyPoisoned.events);
+  if (enemyPoisoned.combat.enemy.hp === 0) {
     return {
-      combat: cleared,
-      events: [...events, ...bitten.events, { type: 'DEFEAT' }],
+      combat: enemyPoisoned.combat,
+      events: [...events, { type: 'VICTORY' }],
+    };
+  }
+
+  const bitten = applyEnemyIntent(enemyPoisoned.combat);
+  const cleared = clearHeroBlocks(bitten.combat);
+  const heroPoisoned = applyPoisonToHeroes(cleared);
+  const retargeted = retargetEnemyIntent(heroPoisoned);
+
+  if (retargeted.heroes.every((hero) => hero.hp === 0)) {
+    return {
+      combat: retargeted,
+      events: [...events, ...bitten.events, ...poisonEventsForHeroes(cleared, retargeted), { type: 'DEFEAT' }],
     };
   }
 
   events.push(...bitten.events, { type: 'ENEMY_TURN_ENDED' }, { type: 'PLAYER_TURN_STARTED' });
-  const refilled = refillHand(discardHand(cleared), 5);
+  const heroPoisonEvents = poisonEventsForHeroes(cleared, retargeted);
+  events.push(...heroPoisonEvents);
+  const refilled = refillHand(discardHand(retargeted), 5);
   events.push(...refilled.events);
 
   return {
@@ -226,10 +268,19 @@ function enemyAttack(combat: CombatState, heroId: HeroId, amount: number): { com
   const hero = intended.hp > 0 ? intended : combat.heroes.find((candidate) => candidate.hp > 0);
   if (!hero) return { combat, events: [] };
 
-  const blocked = Math.min(hero.block, amount);
-  const damage = amount - blocked;
+  const weak = hasStatus(combat.enemy.statuses, 'weak');
+  const warded = hasStatus(hero.statuses, 'ward');
+  const attackAmount = weak ? weakAmount(amount) : amount;
+  const vulnerable = !warded && hasStatus(hero.statuses, 'vulnerable');
+  const incoming = warded ? 0 : vulnerableAmount(attackAmount, vulnerable);
+  const prevented = warded ? attackAmount : 0;
+  const blocked = Math.min(hero.block, incoming);
+  const hitDamage = incoming - blocked;
+  const bleedDamage = hitDamage > 0 ? hero.statuses.bleed : 0;
+  const damage = hitDamage + bleedDamage;
   const targetHero = {
     ...hero,
+    statuses: spendIncomingHeroStatuses(hero.statuses, warded, vulnerable, bleedDamage > 0),
     block: hero.block - blocked,
     hp: Math.max(0, hero.hp - damage),
   };
@@ -242,25 +293,116 @@ function enemyAttack(combat: CombatState, heroId: HeroId, amount: number): { com
   return {
     combat: {
       ...combat,
+      enemy: weak ? { ...combat.enemy, statuses: spendStatus(combat.enemy.statuses, 'weak') } : combat.enemy,
       heroes,
       log: [...combat.log, `${combat.enemy.name} bites ${hero.name}.`],
     },
+    events: [
+      ...(warded ? [{ type: 'STATUS_CONSUMED' as const, status: 'ward' as const, target: heroRef(hero.id), prevented }] : []),
+      {
+        type: 'DAMAGE_DEALT',
+        source: enemyRef(combat),
+        target: heroRef(hero.id),
+        amount: damage,
+        blocked,
+        lethal: targetHero.hp === 0,
+        tags: [
+          'physical',
+          ...(weak ? ['weak' as const] : []),
+          ...(vulnerable ? ['vulnerable' as const] : []),
+          ...(bleedDamage > 0 ? ['bleed' as const] : []),
+        ],
+      },
+    ],
+  };
+}
+
+function weakAmount(amount: number): number {
+  return Math.floor(amount * 0.75);
+}
+
+function vulnerableAmount(amount: number, vulnerable: boolean): number {
+  return vulnerable ? Math.floor(amount * 1.5) : amount;
+}
+
+function spendIncomingDamageStatuses(statuses: EnemyState['statuses'], bled: boolean): EnemyState['statuses'] {
+  const afterBleed = bled ? spendStatus(statuses, 'bleed') : statuses;
+  return consumeStatus(spendStatus(afterBleed, 'vulnerable'), 'mark');
+}
+
+function spendIncomingHeroStatuses(statuses: HeroState['statuses'], warded: boolean, vulnerable: boolean, bled: boolean): HeroState['statuses'] {
+  if (warded) return spendStatus(statuses, 'ward');
+  const afterBleed = bled ? spendStatus(statuses, 'bleed') : statuses;
+  return vulnerable ? spendStatus(afterBleed, 'vulnerable') : afterBleed;
+}
+
+function applyPoisonToEnemy(combat: CombatState): { combat: CombatState; events: CombatEvent[] } {
+  const poison = combat.enemy.statuses.poison;
+  if (poison === 0) return { combat, events: [] };
+  const enemy = {
+    ...combat.enemy,
+    hp: Math.max(0, combat.enemy.hp - poison),
+    statuses: spendStatus(combat.enemy.statuses, 'poison'),
+  };
+  return {
+    combat: { ...combat, enemy },
     events: [{
       type: 'DAMAGE_DEALT',
-      source: enemyRef(combat),
-      target: heroRef(hero.id),
-      amount: damage,
-      blocked,
-      lethal: targetHero.hp === 0,
-      tags: ['physical'],
+      source: { kind: 'system' },
+      target: enemyRef(combat),
+      amount: poison,
+      blocked: 0,
+      lethal: enemy.hp === 0,
+      tags: ['poison'],
     }],
   };
+}
+
+function applyPoisonToHeroes(combat: CombatState): CombatState {
+  return {
+    ...combat,
+    heroes: combat.heroes.map((hero) => {
+      const poison = hero.statuses.poison;
+      if (poison === 0 || hero.hp === 0) return hero;
+      return {
+        ...hero,
+        hp: Math.max(0, hero.hp - poison),
+        statuses: spendStatus(hero.statuses, 'poison'),
+      };
+    }),
+  };
+}
+
+function poisonEventsForHeroes(before: CombatState, after: CombatState): CombatEvent[] {
+  const events: CombatEvent[] = [];
+  before.heroes.forEach((hero) => {
+    const poison = hero.statuses.poison;
+    if (poison === 0 || hero.hp === 0) return;
+    const nextHero = heroById(after.heroes, hero.id);
+    events.push({
+      type: 'DAMAGE_DEALT',
+      source: { kind: 'system' },
+      target: heroRef(hero.id),
+      amount: poison,
+      blocked: 0,
+      lethal: nextHero.hp === 0,
+      tags: ['poison'],
+    });
+  });
+  return events;
 }
 
 function clearHeroBlocks(combat: CombatState): CombatState {
   return {
     ...combat,
     heroes: combat.heroes.map((hero) => (hero.block === 0 ? hero : { ...hero, block: 0 })),
+    enemy: { ...combat.enemy, intent: retargetIntent(combat.enemy.intent, combat.heroes) },
+  };
+}
+
+function retargetEnemyIntent(combat: CombatState): CombatState {
+  return {
+    ...combat,
     enemy: { ...combat.enemy, intent: retargetIntent(combat.enemy.intent, combat.heroes) },
   };
 }
@@ -278,14 +420,16 @@ function applyBlockEffect(
   combat: CombatState,
   cardId: CardInstanceId,
   card: CardDef,
+  target: TargetRef,
   effect: Extract<CardEffect, { type: 'gain-block' }>,
 ): { combat: CombatState; events: CombatEvent[] } {
+  const heroId = heroTarget(target);
   return {
     combat: {
       ...combat,
-      heroes: combat.heroes.map((hero) => (hero.id === card.owner ? { ...hero, block: hero.block + effect.amount } : hero)),
+      heroes: combat.heroes.map((hero) => (hero.id === heroId ? { ...hero, block: hero.block + effect.amount } : hero)),
     },
-    events: [{ type: 'BLOCK_GAINED', heroId: card.owner, amount: effect.amount, source: heroRef(card.owner), cardId, defId: card.id }],
+    events: [{ type: 'BLOCK_GAINED', heroId, amount: effect.amount, source: heroRef(card.owner), cardId, defId: card.id }],
   };
 }
 
@@ -293,16 +437,18 @@ function applyHealEffect(
   combat: CombatState,
   cardId: CardInstanceId,
   card: CardDef,
+  target: TargetRef,
   effect: Extract<CardEffect, { type: 'heal' }>,
 ): { combat: CombatState; events: CombatEvent[] } {
+  const heroId = heroTarget(target);
   return {
     combat: {
       ...combat,
       heroes: combat.heroes.map((hero) =>
-        hero.id === card.owner ? { ...hero, hp: Math.min(hero.maxHp, hero.hp + effect.amount) } : hero,
+        hero.id === heroId ? { ...hero, hp: Math.min(hero.maxHp, hero.hp + effect.amount) } : hero,
       ),
     },
-    events: [{ type: 'HEAL_APPLIED', heroId: card.owner, amount: effect.amount, source: heroRef(card.owner), cardId, defId: card.id }],
+    events: [{ type: 'HEAL_APPLIED', heroId, amount: effect.amount, source: heroRef(card.owner), cardId, defId: card.id }],
   };
 }
 
@@ -310,14 +456,42 @@ function applyStatusEffect(
   combat: CombatState,
   cardId: CardInstanceId,
   card: CardDef,
+  target: TargetRef,
   effect: Extract<CardEffect, { type: 'apply-status' }>,
 ): { combat: CombatState; events: CombatEvent[] } {
+  if (target.kind === 'hero') {
+    const heroes = combat.heroes.map((hero) =>
+      hero.id === target.id ? { ...hero, statuses: addStatus(hero.statuses, effect.status, effect.amount) } : hero,
+    );
+    return {
+      combat: { ...combat, heroes },
+      events: [{
+        type: 'STATUS_APPLIED',
+        status: effect.status,
+        amount: effect.amount,
+        total: heroById(heroes, target.id).statuses[effect.status],
+        source: heroRef(card.owner),
+        target: actorRefForTarget(target),
+        cardId,
+        defId: card.id,
+      }],
+    };
+  }
+
+  const targetEnemy = enemyTarget(combat, target);
+  const enemy = { ...targetEnemy, statuses: addStatus(targetEnemy.statuses, effect.status, effect.amount) };
   return {
-    combat: {
-      ...combat,
-      enemy: effect.status === 'mark' ? { ...combat.enemy, marked: true } : combat.enemy,
-    },
-    events: [{ type: 'STATUS_APPLIED', status: effect.status, source: heroRef(card.owner), target: enemyRef(combat), cardId, defId: card.id }],
+    combat: { ...combat, enemy },
+    events: [{
+      type: 'STATUS_APPLIED',
+      status: effect.status,
+      amount: effect.amount,
+      total: enemy.statuses[effect.status],
+      source: heroRef(card.owner),
+      target: actorRefForTarget(target),
+      cardId,
+      defId: card.id,
+    }],
   };
 }
 
@@ -365,6 +539,21 @@ function heroRef(heroId: HeroId): ActorRef {
 
 function enemyRef(combat: CombatState): ActorRef {
   return { kind: 'enemy', id: combat.enemy.id };
+}
+
+function actorRefForTarget(target: TargetRef): ActorRef {
+  if (target.kind === 'hero') return heroRef(target.id);
+  return { kind: 'enemy', id: target.id };
+}
+
+function heroTarget(target: TargetRef): HeroId {
+  if (target.kind !== 'hero') throw new Error(`Expected hero target, got ${target.kind}`);
+  return target.id;
+}
+
+function enemyTarget(combat: CombatState, target: TargetRef): EnemyState {
+  if (target.kind !== 'enemy' || target.id !== combat.enemy.id) throw new Error(`Expected enemy target, got ${target.kind}:${target.id}`);
+  return combat.enemy;
 }
 
 function addDebt(heroes: HeroState[], heroId: HeroId, amount: number): HeroState[] {
@@ -427,23 +616,48 @@ function findCard(combat: CombatState, cardId: CardInstanceId): CardDef | undefi
   return cardDefFor(combat, cardId);
 }
 
-function createCardInstances(seed: string): CombatState['cards'] {
+function createCardInstances(seed: string, deck: readonly CardDef[]): CombatState['cards'] {
   const cards: CombatState['cards'] = {};
-  S0_CARDS.forEach((card, index) => {
+  deck.forEach((card, index) => {
     const id = cardInstanceId(`${seed}-${index}-${card.id}`);
     cards[id] = { id, defId: card.id };
   });
   return cards;
 }
 
+function shuffleCardIds(cardIds: readonly CardInstanceId[], seed: string): CardInstanceId[] {
+  const shuffled = [...cardIds];
+  const random = seededRandom(`${seed}:deck`);
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex]!, shuffled[index]!];
+  }
+  return shuffled;
+}
+
+function seededRandom(seed: string): () => number {
+  let state = 0x811c9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    state ^= seed.charCodeAt(index);
+    state = Math.imul(state, 0x01000193);
+  }
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function cardDefById(cardId: CardId): CardDef {
-  const card = S0_CARDS.find((candidate) => candidate.id === cardId);
+  const card = ALL_CARDS.find((candidate) => candidate.id === cardId);
   if (!card) throw new Error(`Missing card definition ${cardId}`);
   return card;
 }
 
 function createHero(id: HeroId, name: string, role: string, maxHp: number): HeroState {
-  return { id, name, role, hp: maxHp, maxHp, block: 0, debt: 0 };
+  return { id, name, role, hp: maxHp, maxHp, block: 0, debt: 0, statuses: emptyStatusStacks() };
 }
 
 function heroName(heroId: HeroId, heroes: HeroState[]): string {

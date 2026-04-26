@@ -9,7 +9,27 @@ export type TileCoord = {
   y: number;
 };
 
+export type TilePurpose = 'start' | 'approach' | 'encounter' | 'side-path';
+
+export type FloorTile = Readonly<{
+  coord: TileCoord;
+  walkable: boolean;
+  threat: ThreatBand;
+  purpose: TilePurpose;
+  logLine: string;
+  visual: 'stone-hall' | 'root-arch' | 'side-passage';
+}>;
+
+export type FloorDef = Readonly<{
+  id: FloorId;
+  start: TileCoord;
+  startFacing: Facing;
+  tiles: readonly FloorTile[];
+}>;
+
 export type HeroId = 'liese' | 'eris' | 'mia' | 'robin';
+export type StatusId = 'poison' | 'bleed' | 'weak' | 'vulnerable' | 'mark' | 'ward';
+export type StatusStacks = Readonly<Record<StatusId, number>>;
 
 export type HeroState = {
   id: HeroId;
@@ -19,6 +39,7 @@ export type HeroState = {
   maxHp: number;
   block: number;
   debt: number;
+  statuses: StatusStacks;
 };
 
 export type EnemyState = {
@@ -27,20 +48,44 @@ export type EnemyState = {
   hp: number;
   maxHp: number;
   block: number;
-  marked: boolean;
+  statuses: StatusStacks;
   intent: EnemyIntent;
 };
 
-export type EnemyIntent = { type: 'attack'; target: HeroId; amount: number };
+export type EnemyIntent = Readonly<{ type: 'attack'; target: HeroId; amount: number }>;
 
-export type CardId = 'iron-cut' | 'hold-fast' | 'mend' | 'mark-prey' | 'blood-edge';
+export type CardId =
+  | 'iron-cut'
+  | 'hold-fast'
+  | 'mend'
+  | 'mark-prey'
+  | 'blood-edge'
+  | 'oath-ward'
+  | 'sundering-cut'
+  | 'stone-guard'
+  | 'ringing-blow'
+  | 'sanctuary-veil'
+  | 'quiet-rebuke'
+  | 'white-thread'
+  | 'mercy-cut'
+  | 'prayer-knot'
+  | 'glass-hex'
+  | 'rootfire'
+  | 'black-spark'
+  | 'venom-script'
+  | 'glass-pulse'
+  | 'barbed-shot'
+  | 'shadow-mark'
+  | 'needle-rain'
+  | 'marked-step'
+  | 'tripwire';
 export type CardInstanceId = Brand<string, 'CardInstanceId'>;
 
 export function cardInstanceId(value: string): CardInstanceId {
   return value as CardInstanceId;
 }
 
-export type CardDef = {
+export type CardDef = Readonly<{
   id: CardId;
   name: string;
   owner: HeroId;
@@ -48,7 +93,7 @@ export type CardDef = {
   target: TargetRule;
   effects: readonly CardEffect[];
   text: string;
-};
+}>;
 
 export type CardInstance = {
   id: CardInstanceId;
@@ -65,18 +110,17 @@ export type TargetRef =
   | { kind: 'enemy'; id: string };
 
 export type TargetRule =
-  | { type: 'enemy' }
-  | { type: 'owner' };
+  | Readonly<{ type: 'enemy' }>
+  | Readonly<{ type: 'owner' }>;
 
-export type DamageTag = 'physical' | 'mark' | 'debt';
-export type StatusId = 'mark';
+export type DamageTag = 'physical' | 'mark' | 'debt' | 'weak' | 'vulnerable' | 'poison' | 'bleed';
 
 export type CardEffect =
-  | { type: 'damage'; amount: number; tags: readonly DamageTag[] }
-  | { type: 'gain-block'; amount: number }
-  | { type: 'heal'; amount: number }
-  | { type: 'apply-status'; status: StatusId }
-  | { type: 'gain-debt'; amount: number };
+  | Readonly<{ type: 'damage'; amount: number; tags: readonly DamageTag[] }>
+  | Readonly<{ type: 'gain-block'; amount: number }>
+  | Readonly<{ type: 'heal'; amount: number }>
+  | Readonly<{ type: 'apply-status'; status: StatusId; amount: number }>
+  | Readonly<{ type: 'gain-debt'; amount: number }>;
 
 export type CombatEvent =
   | { type: 'CARD_PLAYED'; cardId: CardInstanceId; defId: CardId; owner: HeroId; cost: number; target: TargetRef }
@@ -93,7 +137,8 @@ export type CombatEvent =
     }
   | { type: 'BLOCK_GAINED'; heroId: HeroId; amount: number; source: ActorRef; cardId?: CardInstanceId; defId?: CardId }
   | { type: 'HEAL_APPLIED'; heroId: HeroId; amount: number; source: ActorRef; cardId?: CardInstanceId; defId?: CardId }
-  | { type: 'STATUS_APPLIED'; status: StatusId; source: ActorRef; target: ActorRef; cardId?: CardInstanceId; defId?: CardId }
+  | { type: 'STATUS_APPLIED'; status: StatusId; amount: number; total: number; source: ActorRef; target: ActorRef; cardId?: CardInstanceId; defId?: CardId }
+  | { type: 'STATUS_CONSUMED'; status: StatusId; target: ActorRef; prevented: number }
   | { type: 'DEBT_GAINED'; heroId: HeroId; amount: number; total: number; source: ActorRef; cardId?: CardInstanceId; defId?: CardId }
   | { type: 'CARD_DRAWN'; cardId: CardInstanceId; defId: CardId }
   | { type: 'CARD_HELD'; cardId: CardInstanceId; defId: CardId }
