@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { FeelSettings } from '../../src/fx/feelScheduler';
 import type { CardId, CardInstanceId, GameEvent, SliceCommand, SliceState } from '../../src/game/types';
+import { MOTION } from '../../src/game/motion';
 
 const SAVE_BROWSER_RECEIPTS = process.env.SAVE_BROWSER_RECEIPTS === '1';
 
@@ -287,6 +288,40 @@ test('M2 browser smoke: Marrowgate enters Underroot and returns with tile progre
     expect(state.lastEvents).toContainEqual({ type: 'MARROWGATE_RETURNED' });
   });
   expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
+  expect(pageErrors).toEqual([]);
+});
+
+test('M2 browser smoke: exploration keeps one buffered movement input', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m2-underroot');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await page.keyboard.press('KeyG');
+  await expect.poll(async () => (await getDebugState(page)).mode).toBe('explore');
+
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+
+  await expect.poll(async () => {
+    const state = await getDebugState(page);
+    return { position: state.position, facing: state.facing, commands: state.commandLog.length };
+  }).toEqual({
+    position: { x: 1, y: 3 },
+    facing: 'north',
+    commands: 3,
+  });
+
+  await page.waitForTimeout(MOTION.explore.forwardMs * 2 + 50);
+  await expectDebugState(page, (state) => {
+    expect(state.position).toEqual({ x: 1, y: 3 });
+    expect(state.facing).toBe('north');
+    expect(state.commandLog.map((command) => command.type)).toEqual(['enter-underroot', 'step-forward', 'step-forward']);
+  });
   expect(pageErrors).toEqual([]);
 });
 
