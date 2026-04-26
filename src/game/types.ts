@@ -1,7 +1,8 @@
 export type Facing = 'north' | 'east' | 'south' | 'west';
 export type ThreatBand = 'calm' | 'uneasy' | 'hunted';
-export type SliceMode = 'explore' | 'combat' | 'victory' | 'defeat';
-export type FloorId = 's0-root-wolf-hallway';
+export type SliceMode = 'town' | 'explore' | 'combat' | 'victory' | 'defeat';
+export type FloorId = 's0-root-wolf-hallway' | 'underroot-m2-placeholder';
+export type TownServiceId = 'gate' | 'vellum' | 'sanctuary';
 export type Brand<T, TBrand extends string> = T & { readonly __brand: TBrand };
 
 export type TileCoord = {
@@ -9,7 +10,14 @@ export type TileCoord = {
   y: number;
 };
 
-export type TilePurpose = 'start' | 'approach' | 'encounter' | 'side-path';
+export type TilePurpose = 'start' | 'approach' | 'encounter' | 'side-path' | 'rest' | 'reward' | 'shortcut' | 'boss-pressure' | 'return';
+
+export type TileInteraction =
+  | Readonly<{ type: 'combat'; id: string; returnTo: 'explore' | 'town' | 'victory'; logLine: string }>
+  | Readonly<{ type: 'rest'; id: string; logLine: string }>
+  | Readonly<{ type: 'reward'; id: string; debt: number; logLine: string }>
+  | Readonly<{ type: 'shortcut'; id: string; to: TileCoord; debt: number; logLine: string }>
+  | Readonly<{ type: 'return-town'; id: string; logLine: string }>;
 
 export type FloorTile = Readonly<{
   coord: TileCoord;
@@ -18,6 +26,13 @@ export type FloorTile = Readonly<{
   purpose: TilePurpose;
   logLine: string;
   visual: 'stone-hall' | 'root-arch' | 'side-passage';
+  movement: 'open' | 'blocked';
+  visualRecipe: string;
+  threatEffect: string;
+  mapBehavior: 'show' | 'hide';
+  encounterIntentPreview: string | null;
+  testExpectation: string;
+  interaction?: TileInteraction;
 }>;
 
 export type FloorDef = Readonly<{
@@ -156,6 +171,10 @@ export type GameEvent =
   | { type: 'FACING_CHANGED'; from: Facing; to: Facing }
   | { type: 'INTERACT_NONE' }
   | { type: 'COMBAT_STARTED' }
+  | { type: 'UNDERROOT_ENTERED' }
+  | { type: 'MARROWGATE_RETURNED' }
+  | { type: 'TOWN_SERVICE_SELECTED'; service: TownServiceId }
+  | { type: 'TILE_INTERACTION_COMPLETED'; id: string; interaction: TileInteraction['type'] }
   | {
       type: 'COMMAND_REJECTED';
       reason: 'wrong-mode';
@@ -190,7 +209,12 @@ export type CombatCommand =
   | { type: 'end-turn' }
   | { type: 'play-card'; cardId: CardInstanceId; target?: TargetRef };
 
-export type SliceCommand = ExploreCommand | CombatCommand;
+export type TownCommand =
+  | { type: 'enter-underroot' }
+  | { type: 'settle-debt' }
+  | { type: 'choose-town-service'; service: TownServiceId };
+
+export type SliceCommand = TownCommand | ExploreCommand | CombatCommand;
 export type SliceCommandType = SliceCommand['type'];
 
 export type SliceState = {
@@ -203,4 +227,10 @@ export type SliceState = {
   log: string[];
   commandLog: SliceCommand[];
   combat: CombatState | null;
+  townService: TownServiceId;
+  townDebt: number;
+  threatClock: number;
+  completedInteractions: string[];
+  activeInteractionId: string | null;
+  combatReturn: 'explore' | 'town' | 'victory' | null;
 };

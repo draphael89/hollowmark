@@ -1,7 +1,8 @@
-import type { CardInstanceId, CombatCommand, ExploreCommand, GameEvent, SliceCommand, SliceState } from '../game/types';
+import type { CardInstanceId, CombatCommand, ExploreCommand, GameEvent, SliceCommand, SliceState, TileInteraction, TownCommand } from '../game/types';
 import { createCombat, endTurn, holdCard, playCard } from './combat';
-import { START_FLOOR_ID } from '../data/floors';
+import { floorForId, START_FLOOR_ID, UNDERROOT_M2_FLOOR_ID } from '../data/floors';
 import { START_FACING, START_POSITION, attemptStep, turnFacing } from './movement';
+import { threatAt, tileAt } from './floor';
 
 export type CommandResult = {
   state: SliceState;
@@ -19,6 +20,33 @@ export function createSliceState(seed = 's0-root-wolf'): SliceState {
     log: ['Marrowgate is behind you. The Underroot waits.'],
     commandLog: [],
     combat: null,
+    townService: 'gate',
+    townDebt: 0,
+    threatClock: 0,
+    completedInteractions: [],
+    activeInteractionId: null,
+    combatReturn: null,
+  };
+}
+
+export function createTownState(seed = 'm2-underroot'): SliceState {
+  const floor = floorForId(UNDERROOT_M2_FLOOR_ID);
+  return {
+    seed,
+    floorId: UNDERROOT_M2_FLOOR_ID,
+    mode: 'town',
+    position: floor.start,
+    facing: floor.startFacing,
+    threat: 'calm',
+    log: ['Marrowgate lanterns burn low. The Underroot gate waits.'],
+    commandLog: [],
+    combat: null,
+    townService: 'gate',
+    townDebt: 0,
+    threatClock: 0,
+    completedInteractions: [],
+    activeInteractionId: null,
+    combatReturn: null,
   };
 }
 
@@ -46,8 +74,73 @@ export function runReplay(commands: SliceCommand[], seed = 's0-root-wolf'): Comm
 }
 
 function applyCommandInner(state: SliceState, command: SliceCommand): CommandResult {
+  if (isTownCommand(command)) return applyTownCommand(state, command);
   if (isExploreCommand(command)) return applyExploreCommand(state, command);
   return applyCombatCommand(state, command);
+}
+
+function applyTownCommand(state: SliceState, command: TownCommand): CommandResult {
+  if (state.mode !== 'town') return rejectWrongMode(state, command);
+
+  if (command.type === 'enter-underroot') {
+    const floor = floorForId(UNDERROOT_M2_FLOOR_ID);
+    return {
+      state: {
+        ...state,
+        townService: 'gate',
+        floorId: UNDERROOT_M2_FLOOR_ID,
+        mode: 'explore',
+        position: floor.start,
+        facing: floor.startFacing,
+        threat: threatAt(floor, floor.start),
+        threatClock: 0,
+        log: [...state.log, 'The gate opens. Wet stone swallows the torchlight.'],
+      },
+      events: [{ type: 'UNDERROOT_ENTERED' }],
+    };
+  }
+
+  if (command.type === 'settle-debt') {
+    if (state.townDebt === 0) {
+      return {
+        state: {
+          ...state,
+          townService: 'sanctuary',
+          log: [...state.log, 'The Sanctuary finds no debt ready to settle.'],
+        },
+        events: [{ type: 'INTERACT_NONE' }],
+      };
+    }
+
+    return {
+      state: {
+        ...state,
+        townService: 'sanctuary',
+        townDebt: 0,
+        log: [...state.log, 'The Sanctuary tallies the debt and lets the party breathe.'],
+      },
+      events: [{ type: 'INTERACT_NONE' }],
+    };
+  }
+
+  if (command.type === 'choose-town-service') {
+    return {
+      state: {
+        ...state,
+        townService: command.service,
+        log: [...state.log, townServiceLog(command.service)],
+      },
+      events: [{ type: 'TOWN_SERVICE_SELECTED', service: command.service }],
+    };
+  }
+
+  return assertNever(command);
+}
+
+function townServiceLog(service: SliceState['townService']): string {
+  if (service === 'gate') return 'The Gate waits with its black stair.';
+  if (service === 'vellum') return 'The Vellum lays the starter deck in a careful grid.';
+  return 'The Sanctuary counts wounds and debt.';
 }
 
 function applyExploreCommand(state: SliceState, command: ExploreCommand): CommandResult {
@@ -80,9 +173,23 @@ function step(state: SliceState, direction: 'forward' | 'back'): CommandResult {
   }
 
   return {
-    state: result.state,
+    state: spendSafety(result.state),
     events: [{ type: 'STEP_MOVED', from: state.position, to: result.state.position, threat: result.state.threat }],
   };
+}
+
+function spendSafety(state: SliceState): SliceState {
+  if (state.floorId !== UNDERROOT_M2_FLOOR_ID) return state;
+  return {
+    ...state,
+    threatClock: state.threatClock + threatStepCost(state.threat),
+  };
+}
+
+function threatStepCost(threat: SliceState['threat']): number {
+  if (threat === 'hunted') return 3;
+  if (threat === 'uneasy') return 2;
+  return 1;
 }
 
 function turn(state: SliceState, direction: 'left' | 'right'): CommandResult {
@@ -98,7 +205,10 @@ function turn(state: SliceState, direction: 'left' | 'right'): CommandResult {
 }
 
 function interact(state: SliceState): CommandResult {
-  if (state.threat !== 'hunted') {
+  const floor = floorForId(state.floorId);
+  const tile = tileAt(floor, state.position);
+  const interaction = tile?.interaction;
+  if (!interaction || state.completedInteractions.includes(interaction.id)) {
     return {
       state: {
         ...state,
@@ -108,14 +218,73 @@ function interact(state: SliceState): CommandResult {
     };
   }
 
+  return resolveInteraction(state, interaction);
+}
+
+function resolveInteraction(state: SliceState, interaction: TileInteraction): CommandResult {
+  if (interaction.type === 'combat') {
+    return {
+      state: {
+        ...state,
+        mode: 'combat',
+        combat: createCombat(state.seed),
+        activeInteractionId: interaction.id,
+        combatReturn: interaction.returnTo,
+        log: [...state.log, interaction.logLine],
+      },
+      events: [{ type: 'COMBAT_STARTED' }],
+    };
+  }
+
+  if (interaction.type === 'rest') {
+    return completeInteraction(state, interaction, { logLine: interaction.logLine });
+  }
+
+  if (interaction.type === 'reward') {
+    return completeInteraction(state, interaction, {
+      townDebt: state.townDebt + interaction.debt,
+      logLine: interaction.logLine,
+    });
+  }
+
+  if (interaction.type === 'shortcut') {
+    const floor = floorForId(state.floorId);
+    return completeInteraction(state, interaction, {
+      position: interaction.to,
+      threat: threatAt(floor, interaction.to),
+      townDebt: state.townDebt + interaction.debt,
+      logLine: interaction.logLine,
+    });
+  }
+
+  if (interaction.type === 'return-town') {
+    const completed = completeInteraction(state, interaction, {
+      mode: 'town',
+      logLine: interaction.logLine,
+    });
+    return {
+      state: completed.state,
+      events: [...completed.events, { type: 'MARROWGATE_RETURNED' }],
+    };
+  }
+
+  return assertNever(interaction);
+}
+
+function completeInteraction(
+  state: SliceState,
+  interaction: Exclude<TileInteraction, { type: 'combat' }>,
+  patch: Partial<Pick<SliceState, 'mode' | 'position' | 'threat' | 'townDebt'>> & { logLine: string },
+): CommandResult {
+  const { logLine, ...statePatch } = patch;
   return {
     state: {
       ...state,
-      mode: 'combat',
-      combat: createCombat(state.seed),
-      log: [...state.log, 'The root arch opens into teeth.'],
+      ...statePatch,
+      completedInteractions: [...state.completedInteractions, interaction.id],
+      log: [...state.log, logLine],
     },
-    events: [{ type: 'COMBAT_STARTED' }],
+    events: [{ type: 'TILE_INTERACTION_COMPLETED', id: interaction.id, interaction: interaction.type }],
   };
 }
 
@@ -133,15 +302,7 @@ function playCombatCard(state: SliceState, command: Extract<CombatCommand, { typ
   const result = playCard(assertCombat(state), command.cardId, command.target);
   if (result.combat === state.combat) return { state, events: result.events };
   if (result.events.some((event) => event.type === 'VICTORY')) {
-    return {
-      state: {
-        ...state,
-        mode: 'victory',
-        combat: result.combat,
-        log: [...state.log, ...result.combat.log.slice(-3), 'Replay saved in the command log.'],
-      },
-      events: result.events,
-    };
+    return resolveCombatVictory(state, result.combat, result.events);
   }
 
   return { state: withCombat(state, result.combat), events: result.events };
@@ -150,15 +311,7 @@ function playCombatCard(state: SliceState, command: Extract<CombatCommand, { typ
 function endCombatTurn(state: SliceState): CommandResult {
   const result = endTurn(assertCombat(state));
   if (result.events.some((event) => event.type === 'VICTORY')) {
-    return {
-      state: {
-        ...state,
-        mode: 'victory',
-        combat: result.combat,
-        log: [...state.log, ...result.combat.log.slice(-3), 'Replay saved in the command log.'],
-      },
-      events: result.events,
-    };
+    return resolveCombatVictory(state, result.combat, result.events);
   }
   if (result.events.some((event) => event.type === 'DEFEAT')) {
     return {
@@ -173,6 +326,54 @@ function endCombatTurn(state: SliceState): CommandResult {
   }
 
   return { state: withCombat(state, result.combat), events: result.events };
+}
+
+function resolveCombatVictory(state: SliceState, combat: NonNullable<SliceState['combat']>, events: GameEvent[]): CommandResult {
+  if (!state.activeInteractionId || !state.combatReturn) {
+    return {
+      state: {
+        ...state,
+        mode: 'victory',
+        combat,
+        log: [...state.log, ...combat.log.slice(-3), 'Replay saved in the command log.'],
+      },
+      events,
+    };
+  }
+
+  const completedEvent: GameEvent = {
+    type: 'TILE_INTERACTION_COMPLETED',
+    id: state.activeInteractionId,
+    interaction: 'combat',
+  };
+
+  if (state.combatReturn === 'victory') {
+    return {
+      state: {
+        ...state,
+        mode: 'victory',
+        combat,
+        activeInteractionId: null,
+        combatReturn: null,
+        log: [...state.log, ...combat.log.slice(-3), 'Replay saved in the command log.'],
+      },
+      events,
+    };
+  }
+
+  const returnedToTown = state.combatReturn === 'town';
+  return {
+    state: {
+      ...state,
+      mode: state.combatReturn,
+      combat: null,
+      completedInteractions: [...state.completedInteractions, state.activeInteractionId],
+      activeInteractionId: null,
+      combatReturn: null,
+      log: [...state.log, ...combat.log.slice(-3), returnedToTown ? 'Marrowgate takes the party back in.' : 'The Underroot path opens again.'],
+    },
+    events: returnedToTown ? [...events, completedEvent, { type: 'MARROWGATE_RETURNED' }] : [...events, completedEvent],
+  };
 }
 
 function withCombat(state: SliceState, combat: NonNullable<SliceState['combat']>): SliceState {
@@ -203,6 +404,10 @@ function isExploreCommand(command: SliceCommand): command is ExploreCommand {
     command.type === 'turn-right' ||
     command.type === 'interact'
   );
+}
+
+function isTownCommand(command: SliceCommand): command is TownCommand {
+  return command.type === 'enter-underroot' || command.type === 'settle-debt' || command.type === 'choose-town-service';
 }
 
 function assertNever(value: never): never {

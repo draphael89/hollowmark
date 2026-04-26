@@ -21,7 +21,10 @@ import {
   type StatusStacks,
   type TargetRef,
   type ThreatBand,
+  type TileInteraction,
   type TileCoord,
+  type TownServiceId,
+  type TownCommand,
 } from '../game/types';
 import { isFloorWalkable, threatAt } from './floor';
 import { emptyStatusStacks, isStatusId, STATUS_IDS } from './status';
@@ -38,8 +41,9 @@ export type LoadResult =
   | { ok: false; error: string };
 
 const facings = ['north', 'east', 'south', 'west'] as const satisfies readonly Facing[];
-const modes = ['explore', 'combat', 'victory', 'defeat'] as const satisfies readonly SliceMode[];
+const modes = ['town', 'explore', 'combat', 'victory', 'defeat'] as const satisfies readonly SliceMode[];
 const threats = ['calm', 'uneasy', 'hunted'] as const satisfies readonly ThreatBand[];
+const townServices = ['gate', 'vellum', 'sanctuary'] as const satisfies readonly TownServiceId[];
 const heroes = ['liese', 'eris', 'mia', 'robin'] as const satisfies readonly HeroId[];
 const cards = ALL_CARDS.map((card) => card.id) satisfies readonly CardId[];
 
@@ -69,6 +73,10 @@ function parseSliceState(value: unknown): SliceState | null {
   if (!isCoord(value.position)) return null;
   if (!isOneOf(value.facing, facings)) return null;
   if (!isOneOf(value.threat, threats)) return null;
+  const townDebt = value.townDebt === undefined ? 0 : value.townDebt;
+  if (!isNonNegativeInteger(townDebt)) return null;
+  const threatClock = value.threatClock === undefined ? 0 : value.threatClock;
+  if (!isNonNegativeInteger(threatClock)) return null;
   const floor = floorForId(floorId);
   if (!isFloorWalkable(floor, value.position)) return null;
   if (threatAt(floor, value.position) !== value.threat) return null;
@@ -77,11 +85,26 @@ function parseSliceState(value: unknown): SliceState | null {
   if (!commandLog) return null;
   const combat = value.combat === null ? null : parseCombat(value.combat);
   if (combat === undefined) return null;
-  if (value.mode === 'explore' && combat) return null;
-  if (value.mode !== 'explore' && !combat) return null;
+  const townService = value.townService === undefined ? 'gate' : value.townService;
+  if (!isOneOf(townService, townServices)) return null;
+  const completedInteractions = parseStringSet(value.completedInteractions ?? []);
+  if (!completedInteractions) return null;
+  const activeInteractionId = parseNullableString(value.activeInteractionId ?? null);
+  if (activeInteractionId === undefined) return null;
+  const combatReturn = parseCombatReturn(value.combatReturn ?? null);
+  if (combatReturn === undefined) return null;
+  if (!completedInteractions.every((id) => interactionForId(floor, id))) return null;
+  if ((value.mode === 'town' || value.mode === 'explore') && combat) return null;
+  if ((value.mode === 'combat' || value.mode === 'victory' || value.mode === 'defeat') && !combat) return null;
   if (combat && !modeMatchesCombat(value.mode, combat)) return null;
   if (combat && !intentMatchesMode(value.mode, combat)) return null;
   if (combat && !commandLogReferencesKnownCards(commandLog, combat)) return null;
+  if ((activeInteractionId === null) !== (combatReturn === null)) return null;
+  if (activeInteractionId && completedInteractions.includes(activeInteractionId)) return null;
+  if (activeInteractionId) {
+    const activeInteraction = interactionForId(floor, activeInteractionId);
+    if (!activeInteraction || activeInteraction.type !== 'combat' || activeInteraction.returnTo !== combatReturn) return null;
+  }
 
   return {
     seed: value.seed,
@@ -93,7 +116,20 @@ function parseSliceState(value: unknown): SliceState | null {
     log: value.log,
     commandLog,
     combat,
+    townService,
+    townDebt,
+    threatClock,
+    completedInteractions,
+    activeInteractionId,
+    combatReturn,
   };
+}
+
+function interactionForId(floor: ReturnType<typeof floorForId>, id: string): TileInteraction | null {
+  for (const tile of floor.tiles) {
+    if (tile.interaction?.id === id) return tile.interaction;
+  }
+  return null;
 }
 
 function intentMatchesMode(mode: SliceMode, combat: CombatState): boolean {
@@ -291,6 +327,12 @@ function parseCommand(value: unknown): SliceCommand | null {
   if (value.type === 'step-forward' || value.type === 'step-back' || value.type === 'turn-left' || value.type === 'turn-right' || value.type === 'interact') {
     return { type: value.type } satisfies ExploreCommand;
   }
+  if (value.type === 'enter-underroot' || value.type === 'settle-debt') {
+    return { type: value.type } satisfies TownCommand;
+  }
+  if (value.type === 'choose-town-service' && isOneOf(value.service, townServices)) {
+    return { type: value.type, service: value.service } satisfies TownCommand;
+  }
   if (value.type === 'end-turn') return { type: 'end-turn' } satisfies CombatCommand;
   if (value.type === 'hold-card' && isString(value.cardId)) {
     return { type: value.type, cardId: cardInstanceId(value.cardId) } satisfies CombatCommand;
@@ -316,6 +358,25 @@ function isCoord(value: unknown): value is TileCoord {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString);
+}
+
+function parseStringSet(value: unknown): string[] | null {
+  if (!isStringArray(value)) return null;
+  const unique = new Set(value);
+  if (unique.size !== value.length) return null;
+  return value;
+}
+
+function parseNullableString(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (isString(value)) return value;
+  return undefined;
+}
+
+function parseCombatReturn(value: unknown): SliceState['combatReturn'] | undefined {
+  if (value === null) return null;
+  if (value === 'explore' || value === 'town' || value === 'victory') return value;
+  return undefined;
 }
 
 function isOneOf<T extends string>(value: unknown, options: readonly T[]): value is T {

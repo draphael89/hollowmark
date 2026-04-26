@@ -3,7 +3,7 @@ import { M1_STARTER_CARDS } from '../src/data/combat';
 import { cardInstanceId, type SliceCommand, type SliceState } from '../src/game/types';
 import { createCombatWithCards } from '../src/systems/combat';
 import { deserializeSave, migrateSave, serializeSave } from '../src/systems/save';
-import { applyCommand, createSliceState } from '../src/systems/slice';
+import { applyCommand, createSliceState, createTownState } from '../src/systems/slice';
 
 describe('versioned saves', () => {
   it('round-trips S0 explore state through JSON', () => {
@@ -14,6 +14,76 @@ describe('versioned saves', () => {
     const result = deserializeSave(JSON.parse(JSON.stringify(serializeSave(state))));
 
     expect(result).toEqual({ ok: true, state });
+  });
+
+  it('round-trips M2 town and completed tile interaction progress', () => {
+    const entered = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    const stepped = applyCommand(entered, { type: 'step-forward' }).state;
+    const rested = applyCommand(stepped, { type: 'interact' }).state;
+    const returned = applyCommand({ ...rested, position: { x: 1, y: 2 }, threat: 'calm' }, { type: 'interact' }).state;
+
+    const result = deserializeSave(JSON.parse(JSON.stringify(serializeSave(returned))));
+
+    expect(result).toEqual({ ok: true, state: returned });
+    expect(result.ok && result.state.mode).toBe('town');
+    expect(result.ok && result.state.townDebt).toBe(0);
+    expect(result.ok && result.state.threatClock).toBe(1);
+    expect(result.ok && result.state.completedInteractions).toContain('underroot-rest-1');
+    expect(result.ok && result.state.completedInteractions).toContain('underroot-return-1');
+  });
+
+  it('rejects M2 saves with unauthored tile interaction progress', () => {
+    const entered = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    const badProgress = serializeSave({
+      ...entered,
+      completedInteractions: ['made-up-rest'],
+    });
+
+    expect(deserializeSave(JSON.parse(JSON.stringify(badProgress)))).toEqual({
+      ok: false,
+      error: 'Save state is invalid.',
+    });
+  });
+
+  it('rejects M2 combat saves with unauthored or mismatched active interactions', () => {
+    const entered = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    const combat = applyCommand({ ...entered, position: { x: 0, y: 4 }, threat: 'hunted' }, { type: 'interact' }).state;
+    const unknownActive = serializeSave({
+      ...combat,
+      activeInteractionId: 'made-up-fight',
+      combatReturn: 'explore',
+    });
+    const wrongReturn = serializeSave({
+      ...combat,
+      combatReturn: 'town',
+    });
+
+    for (const save of [unknownActive, wrongReturn]) {
+      expect(deserializeSave(JSON.parse(JSON.stringify(save)))).toEqual({
+        ok: false,
+        error: 'Save state is invalid.',
+      });
+    }
+  });
+
+  it('round-trips unsettled Marrowgate debt', () => {
+    const entered = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    const reward = applyCommand({ ...entered, position: { x: 2, y: 3 }, threat: 'uneasy' }, { type: 'interact' }).state;
+    const returned = applyCommand({ ...reward, position: { x: 1, y: 2 }, threat: 'calm' }, { type: 'interact' }).state;
+
+    const result = deserializeSave(JSON.parse(JSON.stringify(serializeSave(returned))));
+
+    expect(result).toEqual({ ok: true, state: returned });
+    expect(result.ok && result.state.townDebt).toBe(1);
+  });
+
+  it('round-trips the selected Marrowgate service', () => {
+    const state = applyCommand(createTownState('m2-underroot'), { type: 'choose-town-service', service: 'vellum' }).state;
+
+    const result = deserializeSave(JSON.parse(JSON.stringify(serializeSave(state))));
+
+    expect(result).toEqual({ ok: true, state });
+    expect(result.ok && result.state.townService).toBe('vellum');
   });
 
   it('round-trips active combat, zones, debt, and held cards', () => {
@@ -310,6 +380,9 @@ describe('versioned saves', () => {
       withHeroValue(state, 'liese', 'maxHp', 0),
       withHeroValue(state, 'liese', 'block', -1),
       withHeroValue(state, 'mia', 'debt', 0.5),
+      { ...serializeSave(state), state: { ...state, townDebt: 0.5 } },
+      { ...serializeSave(state), state: { ...state, threatClock: -1 } },
+      { ...serializeSave(state), state: { ...state, townService: 'forge' } },
       withEnemyValue(state, 'hp', -1),
       withEnemyValue(state, 'block', -1),
       withEnemyIntentAmount(state, 0),

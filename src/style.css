@@ -31,3 +31,31 @@ canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
+
+#viewport-guard {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: #e4d4b0;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(122, 31, 43, 0.22), transparent 40%),
+    #08080f;
+}
+
+#viewport-guard[hidden] {
+  display: none;
+}
+
+#viewport-guard strong {
+  color: #f2c36b;
+  font-size: 18px;
+}
+
+#viewport-guard span {
+  color: #c9b79a;
+  font-size: 12px;
+}
