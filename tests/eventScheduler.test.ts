@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EventScheduler, FX_TIMING } from '../src/fx/eventScheduler';
+import { MOTION } from '../src/game/motion';
 import type { GameEvent } from '../src/game/types';
 
 describe('EventScheduler', () => {
@@ -10,19 +11,27 @@ describe('EventScheduler', () => {
 
     scheduler.enqueue(
       [
-        { type: 'DAMAGE', amount: 6, blocked: 0, target: 'enemy' },
-        { type: 'DEBT', heroId: 'mia', amount: 4 },
+        {
+          type: 'DAMAGE_DEALT',
+          source: { kind: 'hero', id: 'liese' },
+          target: { kind: 'enemy', id: 'root-wolf' },
+          amount: 6,
+          blocked: 0,
+          lethal: false,
+          tags: ['physical'],
+        },
+        { type: 'DEBT_GAINED', heroId: 'mia', amount: 4, total: 4, source: { kind: 'hero', id: 'mia' } },
       ],
       (event) => seen.push(event.type),
     );
 
     expect(scheduler.getPendingCount()).toBe(2);
     clock.runUntil(FX_TIMING.damageDelayMs);
-    expect(seen).toEqual(['DAMAGE']);
+    expect(seen).toEqual(['DAMAGE_DEALT']);
     expect(scheduler.getPendingCount()).toBe(1);
 
-    clock.runUntil(FX_TIMING.damageDelayMs + 80 + FX_TIMING.debtDelayMs);
-    expect(seen).toEqual(['DAMAGE', 'DEBT']);
+    clock.runUntil(FX_TIMING.damageDelayMs + MOTION.eventSpacing.damageMs + FX_TIMING.debtDelayMs);
+    expect(seen).toEqual(['DAMAGE_DEALT', 'DEBT_GAINED']);
     expect(scheduler.getPendingCount()).toBe(0);
   });
 });

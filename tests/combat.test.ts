@@ -21,6 +21,19 @@ describe('S0 combat', () => {
     expect(combat.enemy).toEqual(ROOT_WOLF);
   });
 
+  it('authors S0 cards as effect lists', () => {
+    expect(S0_CARDS.map((card) => [card.id, card.effects])).toEqual([
+      ['iron-cut', [{ type: 'damage', amount: 6, tags: ['physical'] }]],
+      ['hold-fast', [{ type: 'gain-block', amount: 8 }]],
+      ['mend', [{ type: 'heal', amount: 6 }]],
+      ['mark-prey', [{ type: 'apply-status', status: 'mark' }]],
+      ['blood-edge', [
+        { type: 'damage', amount: 12, tags: ['physical', 'debt'] },
+        { type: 'gain-debt', amount: 4 },
+      ]],
+    ]);
+  });
+
   it('spends shared energy and damages the enemy', () => {
     const combat = createCombat('test-seed');
     const result = playCard(combat, card(combat, 'iron-cut'));
@@ -28,7 +41,14 @@ describe('S0 combat', () => {
     expect(result.combat.energy).toBe(2);
     expect(result.combat.enemy.hp).toBe(16);
     expect(result.combat.discardPile).toContain(card(combat, 'iron-cut'));
-    expect(result.events).toContainEqual({ type: 'DAMAGE', amount: 6, blocked: 0, target: 'enemy' });
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: 'DAMAGE_DEALT',
+      amount: 6,
+      blocked: 0,
+      target: { kind: 'enemy', id: 'root-wolf' },
+      cardId: card(combat, 'iron-cut'),
+      defId: 'iron-cut',
+    }));
   });
 
   it('makes Blood Edge stronger while adding debt to its owner', () => {
@@ -38,7 +58,37 @@ describe('S0 combat', () => {
 
     expect(result.combat.enemy.hp).toBe(10);
     expect(mia?.debt).toBe(4);
-    expect(result.events).toContainEqual({ type: 'DEBT', heroId: 'mia', amount: 4 });
+    expect(result.events).toContainEqual(expect.objectContaining({ type: 'DEBT_GAINED', heroId: 'mia', amount: 4, total: 4 }));
+  });
+
+  it('emits card causality before authored damage and debt effects', () => {
+    const combat = createCombat('test-seed');
+    const bloodEdge = card(combat, 'blood-edge');
+    const result = playCard(combat, bloodEdge);
+
+    expect(result.events).toEqual([
+      { type: 'CARD_PLAYED', cardId: bloodEdge, defId: 'blood-edge', owner: 'mia', cost: 1, target: { kind: 'enemy', id: 'root-wolf' } },
+      {
+        type: 'DAMAGE_DEALT',
+        source: { kind: 'hero', id: 'mia' },
+        target: { kind: 'enemy', id: 'root-wolf' },
+        amount: 12,
+        blocked: 0,
+        lethal: false,
+        tags: ['physical', 'debt'],
+        cardId: bloodEdge,
+        defId: 'blood-edge',
+      },
+      {
+        type: 'DEBT_GAINED',
+        heroId: 'mia',
+        amount: 4,
+        total: 4,
+        source: { kind: 'hero', id: 'mia' },
+        cardId: bloodEdge,
+        defId: 'blood-edge',
+      },
+    ]);
   });
 
   it('reports enemy block as absorbed damage, not hidden overkill', () => {
@@ -47,7 +97,12 @@ describe('S0 combat', () => {
 
     expect(result.combat.enemy.hp).toBe(combat.enemy.hp);
     expect(result.combat.enemy.block).toBe(4);
-    expect(result.events).toContainEqual({ type: 'DAMAGE', amount: 0, blocked: 6, target: 'enemy' });
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: 'DAMAGE_DEALT',
+      amount: 0,
+      blocked: 6,
+      target: { kind: 'enemy', id: 'root-wolf' },
+    }));
   });
 
   it('supports exactly one held card', () => {
@@ -72,7 +127,7 @@ describe('S0 combat', () => {
     expect(result.combat.held).toBeNull();
     expect(result.combat.discardPile).toContain(mark);
     expect(result.combat.enemy.marked).toBe(true);
-    expect(result.events).toContainEqual({ type: 'MARK' });
+    expect(result.events).toContainEqual(expect.objectContaining({ type: 'STATUS_APPLIED', status: 'mark', cardId: mark, defId: 'mark-prey' }));
   });
 
   it('can finish the S0 fight with the authored burst', () => {
@@ -83,6 +138,7 @@ describe('S0 combat', () => {
 
     expect(result.combat.enemy.hp).toBe(0);
     expect(result.events).toContainEqual({ type: 'VICTORY' });
+    expect(result.events).toContainEqual(expect.objectContaining({ type: 'DAMAGE_DEALT', lethal: true }));
   });
 
   it('stores enemy intent as typed combat data rendered separately for UI', () => {
@@ -105,6 +161,41 @@ describe('S0 combat', () => {
     expect(missingHold.events).toContainEqual({ type: 'CARD_REJECTED', cardId: 'missing-card', reason: 'missing-card' });
   });
 
+  it('validates explicit card targets before spending energy or moving cards', () => {
+    const combat = createCombat('test-seed');
+    const ironCut = card(combat, 'iron-cut');
+    const holdFast = card(combat, 'hold-fast');
+    const wrongKind = playCard(combat, ironCut, { kind: 'hero', id: 'liese' });
+    const wrongOwner = playCard(combat, holdFast, { kind: 'hero', id: 'eris' });
+    const deadEnemy = playCard({ ...combat, enemy: { ...combat.enemy, hp: 0 } }, ironCut, { kind: 'enemy', id: 'root-wolf' });
+
+    expect(wrongKind.combat).toBe(combat);
+    expect(wrongKind.events).toEqual([{ type: 'CARD_REJECTED', cardId: ironCut, reason: 'invalid-target', target: { kind: 'hero', id: 'liese' } }]);
+    expect(wrongOwner.combat).toBe(combat);
+    expect(wrongOwner.events).toEqual([{ type: 'CARD_REJECTED', cardId: holdFast, reason: 'invalid-target', target: { kind: 'hero', id: 'eris' } }]);
+    expect(deadEnemy.events).toEqual([{ type: 'CARD_REJECTED', cardId: ironCut, reason: 'dead-target', target: { kind: 'enemy', id: 'root-wolf' } }]);
+  });
+
+  it('resolves default targets for every S0 card definition', () => {
+    const expectedTargets = {
+      'iron-cut': { kind: 'enemy', id: 'root-wolf' },
+      'hold-fast': { kind: 'hero', id: 'liese' },
+      mend: { kind: 'hero', id: 'eris' },
+      'mark-prey': { kind: 'enemy', id: 'root-wolf' },
+      'blood-edge': { kind: 'enemy', id: 'root-wolf' },
+    } satisfies Record<CardId, { kind: 'enemy'; id: string } | { kind: 'hero'; id: string }>;
+
+    for (const cardId of Object.keys(expectedTargets) as CardId[]) {
+      const combat = createCombat('test-seed');
+      const played = playCard(combat, card(combat, cardId));
+      expect(played.events[0]).toEqual(expect.objectContaining({
+        type: 'CARD_PLAYED',
+        defId: cardId,
+        target: expectedTargets[cardId],
+      }));
+    }
+  });
+
   it('resolves the wolf turn by biting Liese for 6', () => {
     const result = endTurn(createCombat('test-seed'));
     const liese = result.combat.heroes.find((hero) => hero.id === 'liese');
@@ -115,7 +206,7 @@ describe('S0 combat', () => {
     expect(liese?.block).toBe(0);
     expect(result.events.map((event) => event.type)).toEqual([
       'ENEMY_TURN_STARTED',
-      'DAMAGE',
+      'DAMAGE_DEALT',
       'ENEMY_TURN_ENDED',
       'PLAYER_TURN_STARTED',
       'CARD_DRAWN',
@@ -127,7 +218,13 @@ describe('S0 combat', () => {
     ]);
     expect(result.combat.hand).toHaveLength(5);
     expect(result.combat.discardPile).toEqual([]);
-    expect(result.events).toContainEqual({ type: 'DAMAGE', amount: 6, blocked: 0, target: 'liese' });
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: 'DAMAGE_DEALT',
+      amount: 6,
+      blocked: 0,
+      source: { kind: 'enemy', id: 'root-wolf' },
+      target: { kind: 'hero', id: 'liese' },
+    }));
   });
 
   it('lets block absorb wolf damage before HP changes', () => {
@@ -138,7 +235,12 @@ describe('S0 combat', () => {
 
     expect(liese?.hp).toBe(31);
     expect(liese?.block).toBe(0);
-    expect(result.events).toContainEqual({ type: 'DAMAGE', amount: 0, blocked: 6, target: 'liese' });
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: 'DAMAGE_DEALT',
+      amount: 0,
+      blocked: 6,
+      target: { kind: 'hero', id: 'liese' },
+    }));
   });
 
   it('emits defeat after the wolf downs the last living heroes', () => {

@@ -60,4 +60,21 @@ describe('mode-safe slice reducer', () => {
     expect(result.state.mode).toBe('defeat');
     expect(result.events.at(-1)).toEqual({ type: 'DEFEAT' });
   });
+
+  it('rejects invalid explicit combat targets through the slice boundary', () => {
+    let state = createSliceState();
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'interact' }).state;
+    const combat = state.combat!;
+    const ironCut = combat.hand.find((cardId) => combat.cards[cardId]?.defId === 'iron-cut');
+    if (!ironCut) throw new Error('Missing Iron Cut');
+
+    const result = applyCommand(state, { type: 'play-card', cardId: ironCut, target: { kind: 'hero', id: 'liese' } });
+
+    expect(result.state.mode).toBe('combat');
+    expect(result.state.combat).toBe(combat);
+    expect(result.state.commandLog.at(-1)).toEqual({ type: 'play-card', cardId: ironCut, target: { kind: 'hero', id: 'liese' } });
+    expect(result.events).toEqual([{ type: 'CARD_REJECTED', cardId: ironCut, reason: 'invalid-target', target: { kind: 'hero', id: 'liese' } }]);
+  });
 });

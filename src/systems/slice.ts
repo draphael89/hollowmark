@@ -1,5 +1,6 @@
 import type { CardInstanceId, CombatCommand, ExploreCommand, GameEvent, SliceCommand, SliceState } from '../game/types';
 import { createCombat, endTurn, holdCard, playCard } from './combat';
+import { START_FLOOR_ID } from '../data/floors';
 import { START_FACING, START_POSITION, attemptStep, turnFacing } from './movement';
 
 export type CommandResult = {
@@ -10,6 +11,7 @@ export type CommandResult = {
 export function createSliceState(seed = 's0-root-wolf'): SliceState {
   return {
     seed,
+    floorId: START_FLOOR_ID,
     mode: 'explore',
     position: START_POSITION,
     facing: START_FACING,
@@ -64,7 +66,7 @@ function applyCombatCommand(state: SliceState, command: CombatCommand): CommandR
 
   if (command.type === 'end-turn') return endCombatTurn(state);
   if (command.type === 'hold-card') return holdCombatCard(state, command.cardId);
-  if (command.type === 'play-card') return playCombatCard(state, command.cardId);
+  if (command.type === 'play-card') return playCombatCard(state, command);
   return assertNever(command);
 }
 
@@ -127,8 +129,8 @@ function holdCombatCard(state: SliceState, cardId: CardInstanceId): CommandResul
   };
 }
 
-function playCombatCard(state: SliceState, cardId: CardInstanceId): CommandResult {
-  const result = playCard(assertCombat(state), cardId);
+function playCombatCard(state: SliceState, command: Extract<CombatCommand, { type: 'play-card' }>): CommandResult {
+  const result = playCard(assertCombat(state), command.cardId, command.target);
   if (result.combat === state.combat) return { state, events: result.events };
   if (result.events.some((event) => event.type === 'VICTORY')) {
     return {
