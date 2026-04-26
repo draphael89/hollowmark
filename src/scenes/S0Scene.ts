@@ -4,12 +4,12 @@ import { getInitialFeelSettings, planFeelCues, type FeelCue, type FeelSettings, 
 import { GAME_HEIGHT, GAME_WIDTH, S0_LAYOUT, SIDE_PANEL, TRAY, VIEWPORT } from '../game/layout';
 import { MOTION } from '../game/motion';
 import { THEME } from '../game/theme';
-import type { CardDef, CardInstanceId, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId } from '../game/types';
+import type { CardDef, CardInstanceId, CombatState, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId, TownCommand } from '../game/types';
 import { M1_STARTER_CARDS } from '../data/combat';
 import { cardDefFor, createCombatWithCards, renderIntentText } from '../systems/combat';
 import { floorForId } from '../data/floors';
 import { deserializeSave, serializeSave } from '../systems/save';
-import { applyCommand, createSliceState } from '../systems/slice';
+import { applyCommand, createSliceState, createTownState } from '../systems/slice';
 import { emptyStatusStacks, hasStatus, statusRule, statusSummary } from '../systems/status';
 import { computeViewSlots, viewSlot } from '../systems/viewSlots';
 
@@ -25,12 +25,14 @@ declare global {
       pendingEvents: number;
       state: SliceState;
       selectedCardId: CardInstanceId | null;
+      selectedCardDetail: string | null;
       selectedCardHint: string | null;
       selectedCardSummary: string | null;
       selectedStatusRule: string | null;
       intentText: string | null;
       feelSettings: FeelSettings;
       lastEvents: readonly GameEvent[];
+      dispatch?: (command: SliceCommand) => readonly GameEvent[];
     };
   }
 }
@@ -41,6 +43,16 @@ const textStyle = THEME.textStyle;
 const layout = S0_LAYOUT;
 const SAVE_KEY = 'hollowmark:s0-save';
 const M1_COMBAT_SEED = 'm1-natural-19';
+const COMPACT_CARD_NAMES: Record<string, string> = {
+  'Ringing Blow': 'Ring Blow',
+  'Shadow Mark': 'Shado Mark',
+  'Quiet Rebuke': 'Quiet Reb',
+  'Prayer Knot': 'Pray Knot',
+  'Black Spark': 'Black Spk',
+  'Glass Pulse': 'Glass P',
+  'Sundering Cut': 'Sunde Cut',
+  'Sanctuary Veil': 'Sanct Veil',
+};
 
 export class S0Scene extends Phaser.Scene {
   private state = createSliceState();
@@ -67,25 +79,35 @@ export class S0Scene extends Phaser.Scene {
   create() {
     this.state = initialStateForLocation(window.location);
     this.buildViews();
-    this.input.keyboard?.on('keydown-W', () => this.dispatch({ type: 'step-forward' }));
-    this.input.keyboard?.on('keydown-UP', () => this.dispatch({ type: 'step-forward' }));
-    this.input.keyboard?.on('keydown-S', () => this.dispatch({ type: 'step-back' }));
-    this.input.keyboard?.on('keydown-DOWN', () => this.dispatch({ type: 'step-back' }));
-    this.input.keyboard?.on('keydown-A', () => this.dispatch({ type: 'turn-left' }));
-    this.input.keyboard?.on('keydown-LEFT', () => this.dispatch({ type: 'turn-left' }));
-    this.input.keyboard?.on('keydown-D', () => this.dispatch({ type: 'turn-right' }));
-    this.input.keyboard?.on('keydown-RIGHT', () => this.dispatch({ type: 'turn-right' }));
-    this.input.keyboard?.on('keydown-SPACE', () => this.dispatch({ type: 'interact' }));
-    this.input.keyboard?.on('keydown-H', () => this.holdSelected());
-    this.input.keyboard?.on('keydown-ENTER', () => this.playSelected());
-    this.input.keyboard?.on('keydown-T', () => this.endTurn());
-    this.input.keyboard?.on('keydown-R', () => this.restartRun());
+    this.bindKey('W', () => this.dispatch({ type: 'step-forward' }));
+    this.bindKey('UP', () => this.dispatch({ type: 'step-forward' }));
+    this.bindKey('S', () => this.dispatch({ type: 'step-back' }));
+    this.bindKey('DOWN', () => this.dispatch({ type: 'step-back' }));
+    this.bindKey('A', () => this.dispatch({ type: 'turn-left' }));
+    this.bindKey('LEFT', () => this.dispatch({ type: 'turn-left' }));
+    this.bindKey('D', () => this.dispatch({ type: 'turn-right' }));
+    this.bindKey('RIGHT', () => this.dispatch({ type: 'turn-right' }));
+    this.bindKey('SPACE', () => this.dispatch(this.state.mode === 'town' ? { type: 'enter-underroot' } : { type: 'interact' }));
+    this.bindKey('G', () => this.dispatchTownCommand({ type: 'enter-underroot' }));
+    this.bindKey('V', () => this.dispatchTownCommand({ type: 'choose-town-service', service: 'vellum' }));
+    this.bindKey('C', () => this.dispatchTownCommand({ type: 'settle-debt' }));
+    this.bindKey('H', () => this.holdSelected());
+    this.bindKey('ENTER', () => this.playSelected());
+    this.bindKey('T', () => this.endTurn());
+    this.bindKey('R', () => this.restartRun());
     ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'].forEach((key, index) => {
-      this.input.keyboard?.on(`keydown-${key}`, () => this.selectCard(index));
+      this.bindKey(key, () => this.selectCard(index));
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shutdownScene());
 
     this.syncFromState();
+  }
+
+  private bindKey(key: string, onPress: () => void): void {
+    this.input.keyboard?.on(`keydown-${key}`, (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      onPress();
+    });
   }
 
   private buildViews() {
@@ -107,7 +129,7 @@ export class S0Scene extends Phaser.Scene {
     const result = applyCommand(this.state, command);
     this.state = result.state;
     this.lastEvents = result.events;
-    if (!isM1CombatRoute(window.location)) persistState(this.state);
+    if (!isLabRoute(window.location)) persistState(this.state);
 
     if (command.type === 'play-card') {
       this.selectedCardId = null;
@@ -119,9 +141,14 @@ export class S0Scene extends Phaser.Scene {
     return result.events;
   }
 
+  private dispatchTownCommand(command: TownCommand): void {
+    if (this.state.mode !== 'town') return;
+    this.dispatch(command);
+  }
+
   private restartRun(): void {
     if (this.state.mode !== 'victory' && this.state.mode !== 'defeat') return;
-    if (!isM1CombatRoute(window.location)) clearSavedState();
+    if (!isLabRoute(window.location)) clearSavedState();
     this.eventScheduler.reset();
     this.fx.clear(true, true);
     this.clearHitStop();
@@ -159,6 +186,11 @@ export class S0Scene extends Phaser.Scene {
   }
 
   private drawViewport() {
+    if (this.state.mode === 'town') {
+      this.drawTownView();
+      return;
+    }
+
     if (this.state.mode === 'combat' || this.state.mode === 'victory' || this.state.mode === 'defeat') {
       this.drawCombatView();
       return;
@@ -236,6 +268,28 @@ export class S0Scene extends Phaser.Scene {
     this.label(`Facing ${this.state.facing.toUpperCase()}  ${current.coord.x},${current.coord.y}`, viewport.facingLabel.x, viewport.facingLabel.y);
   }
 
+  private drawTownView() {
+    const g = this.viewport;
+    const viewport = layout.viewport;
+    g.fillStyle(colors.voidDeep, 1).fillRect(
+      VIEWPORT.x + viewport.innerPad,
+      VIEWPORT.y + viewport.innerPad,
+      VIEWPORT.w - viewport.innerPad * 2,
+      VIEWPORT.h - viewport.innerPad * 2,
+    );
+    g.fillStyle(colors.stone, 1).fillRect(viewport.exploreBackWall.x, viewport.exploreBackWall.y, viewport.exploreBackWall.w, viewport.exploreBackWall.h);
+    g.fillStyle(colors.moss, THEME.alpha.combatFloorShadow).fillEllipse(220, 158, 210, 52);
+    g.lineStyle(2, colors.gold, 1).strokeRect(172, 72, 96, 112);
+    g.lineStyle(1, colors.oxblood, 1).strokeRect(182, 82, 76, 92);
+    g.fillStyle(colors.void, 0.9).fillRect(194, 100, 52, 74);
+    g.lineStyle(1, colors.moss, 0.75);
+    for (let x = 180; x <= 260; x += 10) {
+      g.lineBetween(x, 76, x - 16, 176);
+    }
+    this.label('MARROWGATE', 188, 52, text.gold);
+    this.label(`Service: ${townServiceName(this.state.townService)}`, 174, 196, text.mutedBone);
+  }
+
   private drawCombatView() {
     const g = this.viewport;
     const combatLayout = layout.combat;
@@ -296,6 +350,13 @@ export class S0Scene extends Phaser.Scene {
 
   private drawTray() {
     const tray = layout.tray;
+    if (this.state.mode === 'town') {
+      this.label(this.state.log.slice(-2).join('\n'), tray.log.x, tray.log.y);
+      this.label(`Service ${townServiceName(this.state.townService)}   Sanctuary debt ${this.state.townDebt}`, tray.exploreHint.x, tray.exploreHint.y - 14, this.state.townDebt > 0 ? text.gold : text.mutedBone);
+      this.label('Space/G Gate   V Vellum   C Sanctuary', tray.exploreHint.x, tray.exploreHint.y, text.cyan);
+      return;
+    }
+
     if (this.state.mode !== 'combat' && this.state.mode !== 'victory' && this.state.mode !== 'defeat') {
       this.label(this.state.log.slice(-3).join('\n'), tray.log.x, tray.log.y);
       this.label('W/S step   A/D turn   Space interact', tray.exploreHint.x, tray.exploreHint.y, text.mutedBone);
@@ -339,11 +400,12 @@ export class S0Scene extends Phaser.Scene {
     const selected = cardId === this.selectedCardId;
     const cardRect = layout.tray.card;
     const debtCard = hasDebtEffect(card);
-    g.fillStyle(debtCard ? colors.oxblood : colors.panel, 1).fillRect(x, y, cardRect.w, cardRect.h);
-    g.lineStyle(1, selected ? colors.gold : colors.stoneLight, 1).strokeRect(x, y, cardRect.w, cardRect.h);
-    this.label(`${card.cost} ${heroCode(card.owner)} ${targetCode(card)}`, x + cardRect.textX, y + cardRect.ownerY, selected ? text.gold : text.mutedBone);
-    this.label(card.name, x + cardRect.textX, y + cardRect.nameY, selected ? text.gold : text.bone);
-    this.label(cardSummary(card), x + cardRect.textX, y + cardRect.bodyY, debtCard ? text.gold : text.mutedBone);
+    const blocked = !cardPlayable(this.assertCombat(), card);
+    g.fillStyle(debtCard ? colors.oxblood : colors.panel, blocked ? 0.68 : 1).fillRect(x, y, cardRect.w, cardRect.h);
+    g.lineStyle(1, selected ? colors.gold : blocked ? colors.red : colors.stoneLight, 1).strokeRect(x, y, cardRect.w, cardRect.h);
+    this.label(`${card.cost} ${heroCode(card.owner)} ${targetCode(card)}`, x + cardRect.textX, y + cardRect.ownerY, selected ? text.gold : blocked ? text.red : text.mutedBone);
+    this.label(compactCardName(card.name), x + cardRect.textX, y + cardRect.nameY, selected ? text.gold : text.bone);
+    this.label(cardSummary(card), x + cardRect.textX, y + cardRect.bodyY, debtCard ? text.gold : blocked ? text.red : text.mutedBone);
     this.zone(x, y, cardRect.w, cardRect.h, () => {
       this.selectedCardId = cardId;
       this.tone(MOTION.audio.cardSelectToneHz, MOTION.audio.cardSelectMs);
@@ -361,11 +423,21 @@ export class S0Scene extends Phaser.Scene {
       { id: 'robin', name: 'Robin', role: 'Ranger', hp: 23, maxHp: 23, block: 0, debt: 0, statuses: emptyStatusStacks() },
     ];
 
-    this.label('MINIMAP', side.title.x, side.title.y, text.gold);
-    this.drawMiniMap();
+    this.label(this.selectedCardId && combat ? 'CARD' : 'MINIMAP', side.title.x, side.title.y, text.gold);
+    if (this.selectedCardId && combat) this.drawSelectedCardDetail(cardDefFor(combat, this.selectedCardId));
+    else this.drawMiniMap();
     heroes.forEach((hero, index) => this.drawHero(hero, side.heroStartY + index * side.heroGapY));
     this.label(`Seed: ${this.state.seed}`, side.seed.x, side.seed.y, text.mutedBone);
     this.label(`Commands: ${this.state.commandLog.length}`, side.commandCount.x, side.commandCount.y, text.mutedBone);
+  }
+
+  private drawSelectedCardDetail(card: CardDef) {
+    const detail = layout.sidePanel.selectedCard;
+    this.sidePanel.fillStyle(colors.panelDeep, 1).fillRect(detail.x, detail.y, detail.w, detail.h);
+    this.sidePanel.lineStyle(1, hasDebtEffect(card) ? colors.gold : colors.stoneLight, 1).strokeRect(detail.x, detail.y, detail.w, detail.h);
+    this.label(card.name, detail.title.x, detail.title.y, hasDebtEffect(card) ? text.gold : text.bone);
+    this.label(`${heroCode(card.owner)}  Cost ${card.cost}  ${targetLabel(card)}`, detail.meta.x, detail.meta.y, text.cyan);
+    this.label(cardRules(card), detail.rules.x, detail.rules.y, hasDebtEffect(card) ? text.gold : text.mutedBone);
   }
 
   private drawMiniMap() {
@@ -422,10 +494,14 @@ export class S0Scene extends Phaser.Scene {
       return;
     }
     if (this.state.mode === 'explore') {
-      this.label(`${threat}     W/S step     A/D turn     Space interact`, layout.footer.label.x, layout.footer.label.y, this.state.threat === 'hunted' ? text.gold : text.mutedBone);
+      this.label(`${threat}     ${pressureCue(this.state)}     W/S step     A/D turn     Space interact`, layout.footer.label.x, layout.footer.label.y, this.state.threat === 'hunted' ? text.gold : text.mutedBone);
       return;
     }
-    const selected = this.selectedCardHint();
+    if (this.state.mode === 'town') {
+      this.label(`Marrowgate     ${townServiceName(this.state.townService)}     Gate G     Vellum V     Sanctuary C`, layout.footer.label.x, layout.footer.label.y, text.cyan);
+      return;
+    }
+    const selected = this.selectedCardFooterHint();
     this.label(`${threat}     ${selected}`, layout.footer.label.x, layout.footer.label.y, this.state.threat === 'hunted' ? text.gold : text.mutedBone);
   }
 
@@ -435,6 +511,13 @@ export class S0Scene extends Phaser.Scene {
     const effectHints = selectedEffectHints(card);
     const hint = effectHints.length > 0 ? `     ${effectHints.join('     ')}` : '';
     return `Selected ${card.name}     ${this.targetHint(card)}${hint}`;
+  }
+
+  private selectedCardFooterHint(): string {
+    if (!this.selectedCardId || !this.state.combat) return 'Select card, click enemy/Hold, or T/Enter to end turn';
+    const card = cardDefFor(this.state.combat, this.selectedCardId);
+    const hints = selectedEffectHints(card).map(shortEffectHint);
+    return `Selected ${card.name}     ${this.targetHint(card)}${hints.length > 0 ? `     ${hints.join('     ')}` : ''}`;
   }
 
   private selectedStatusRule(): string | null {
@@ -642,7 +725,7 @@ export class S0Scene extends Phaser.Scene {
   }
 
   private publishDebug() {
-    window.__HOLLOWMARK_DEBUG__ = {
+    const debug = {
       objectCounts: {
         total: this.children.length,
         dynamicLabels: this.dynamicLabels.getLength(),
@@ -652,6 +735,7 @@ export class S0Scene extends Phaser.Scene {
       pendingEvents: this.eventScheduler.getPendingCount(),
       state: structuredClone(this.state),
       selectedCardId: this.selectedCardId,
+      selectedCardDetail: this.selectedCardId && this.state.combat ? selectedCardDetail(cardDefFor(this.state.combat, this.selectedCardId)) : null,
       selectedCardHint: this.selectedCardId ? this.selectedCardHint() : null,
       selectedCardSummary: this.selectedCardId && this.state.combat ? cardSummary(cardDefFor(this.state.combat, this.selectedCardId)) : null,
       selectedStatusRule: this.selectedStatusRule(),
@@ -659,12 +743,28 @@ export class S0Scene extends Phaser.Scene {
       feelSettings: this.feelSettings,
       lastEvents: this.lastEvents,
     };
+    window.__HOLLOWMARK_DEBUG__ = isLabRoute(window.location)
+      ? { ...debug, dispatch: (command: SliceCommand) => this.dispatch(command) }
+      : debug;
   }
 
   private targetHint(card: CardDef): string {
     if (card.target.type === 'enemy') return 'Click enemy or Enter';
     return `Plays on ${heroName(card.owner)}`;
   }
+}
+
+function pressureCue(state: SliceState): string {
+  if (state.floorId !== 'underroot-m2-placeholder') return 'steady';
+  if (state.threatClock >= 8) return 'roots hunting';
+  if (state.threatClock >= 4) return 'roots listening';
+  return 'quiet pressure';
+}
+
+function townServiceName(service: SliceState['townService']): string {
+  if (service === 'gate') return 'Gate';
+  if (service === 'vellum') return 'Vellum';
+  return 'Sanctuary';
 }
 
 function heroIndex(heroId: HeroId): number {
@@ -693,6 +793,7 @@ function heroCode(heroId: HeroId): string {
 }
 
 function initialStateForLocation(location: Pick<Location, 'search'>): SliceState {
+  if (isM2UnderrootRoute(location)) return createTownState('m2-underroot');
   if (!isM1CombatRoute(location)) return loadSavedState();
   const state = createSliceState(M1_COMBAT_SEED);
   return {
@@ -709,12 +810,48 @@ function isM1CombatRoute(location: Pick<Location, 'search'>): boolean {
   return new URLSearchParams(location.search).get('scene') === 'm1-combat';
 }
 
+function isM2UnderrootRoute(location: Pick<Location, 'search'>): boolean {
+  return new URLSearchParams(location.search).get('scene') === 'm2-underroot';
+}
+
+function isLabRoute(location: Pick<Location, 'search'>): boolean {
+  return isM1CombatRoute(location) || isM2UnderrootRoute(location);
+}
+
 function targetCode(card: CardDef): string {
   return card.target.type === 'enemy' ? 'EN' : 'OWN';
 }
 
+function targetLabel(card: CardDef): string {
+  return card.target.type === 'enemy' ? 'Enemy' : 'Owner';
+}
+
+function compactCardName(name: string): string {
+  const fixed = COMPACT_CARD_NAMES[name];
+  if (fixed) return fixed;
+  if (name.length <= 10) return name;
+  return name
+    .split(' ')
+    .map((part) => part.length > 5 ? part.slice(0, 5) : part)
+    .join(' ')
+    .slice(0, 10);
+}
+
+function cardPlayable(combat: CombatState, card: CardDef): boolean {
+  const owner = combat.heroes.find((hero) => hero.id === card.owner);
+  return combat.energy >= card.cost && !!owner && owner.hp > 0;
+}
+
 function cardSummary(card: CardDef): string {
   return card.effects.map(effectSummary).join(' ') || (card.text.split('\n')[0] ?? '');
+}
+
+function selectedCardDetail(card: CardDef): string {
+  return `${card.name} | ${heroCode(card.owner)} Cost ${card.cost} ${targetLabel(card)} | ${cardRules(card)}`;
+}
+
+function cardRules(card: CardDef): string {
+  return card.text.split('\n').map((line) => line.replace(/\.$/, '')).join(' / ');
 }
 
 function selectedEffectHints(card: CardDef): string[] {
@@ -723,6 +860,16 @@ function selectedEffectHints(card: CardDef): string[] {
     if (effect.type === 'gain-debt') return [`Debt +${effect.amount}`];
     return [];
   });
+}
+
+function shortEffectHint(hint: string): string {
+  if (hint === 'Mark adds burst damage') return 'Mark burst';
+  if (hint === 'Vulnerable amplifies next hit') return 'Vuln amp';
+  if (hint === 'Poison ticks before action') return 'Poison clock';
+  if (hint === 'Bleed opens on HP hits') return 'Bleed payoff';
+  if (hint === 'Weak softens next hit') return 'Weak hit';
+  if (hint === 'Ward prevents one hit') return 'Ward save';
+  return hint;
 }
 
 function effectSummary(effect: CardDef['effects'][number]): string {

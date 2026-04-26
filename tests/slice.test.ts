@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cardInstanceId } from '../src/game/types';
-import { applyCommand, createSliceState } from '../src/systems/slice';
+import { floorForId, UNDERROOT_M2_FLOOR_ID } from '../src/data/floors';
+import { cardInstanceId, type FloorDef, type TileCoord } from '../src/game/types';
+import { applyCommand, createSliceState, createTownState } from '../src/systems/slice';
 
 describe('mode-safe slice reducer', () => {
   it('rejects combat commands while exploring', () => {
@@ -101,4 +102,190 @@ describe('mode-safe slice reducer', () => {
     expect(result.state.commandLog.at(-1)).toEqual({ type: 'play-card', cardId: ironCut, target: { kind: 'hero', id: 'liese' } });
     expect(result.events).toEqual([{ type: 'CARD_REJECTED', cardId: ironCut, reason: 'invalid-target', target: { kind: 'hero', id: 'liese' } }]);
   });
+
+  it('enters the placeholder Underroot floor from Marrowgate', () => {
+    const result = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' });
+
+    expect(result.state.mode).toBe('explore');
+    expect(result.state.floorId).toBe('underroot-m2-placeholder');
+    expect(result.state.position).toEqual({ x: 1, y: 5 });
+    expect(result.events).toContainEqual({ type: 'UNDERROOT_ENTERED' });
+  });
+
+  it('keeps every authored Underroot interaction reachable from the entrance', () => {
+    const floor = floorForId(UNDERROOT_M2_FLOOR_ID);
+    const reachable = reachableTileKeys(floor);
+    const interactions = floor.tiles.filter((tile) => tile.walkable && tile.interaction);
+
+    expect(interactions.map((tile) => tile.interaction?.id)).toEqual([
+      'underroot-rest-1',
+      'underroot-normal-1',
+      'underroot-reward-1',
+      'underroot-shortcut-1',
+      'underroot-return-1',
+      'underroot-boss-1',
+    ]);
+    for (const tile of interactions) {
+      expect(reachable.has(tileKey(tile.coord)), `${tile.interaction?.id} at ${tileKey(tile.coord)} should be reachable`).toBe(true);
+    }
+  });
+
+  it('resolves authored rest, reward, and shortcut tile interactions once', () => {
+    let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    expect(state.position).toEqual({ x: 1, y: 4 });
+
+    const rest = applyCommand(state, { type: 'interact' });
+    expect(rest.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-rest-1', interaction: 'rest' });
+    expect(rest.state.completedInteractions).toContain('underroot-rest-1');
+    expect(rest.state.log.at(-1)).toContain('Sanctuary moss');
+
+    const repeated = applyCommand(rest.state, { type: 'interact' });
+    expect(repeated.events).toEqual([{ type: 'INTERACT_NONE' }]);
+
+    state = applyCommand(rest.state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'turn-right' }).state;
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    expect(state.position).toEqual({ x: 2, y: 3 });
+
+    const reward = applyCommand(state, { type: 'interact' });
+    expect(reward.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-reward-1', interaction: 'reward' });
+    expect(reward.state.completedInteractions).toContain('underroot-reward-1');
+    expect(reward.state.townDebt).toBe(1);
+
+    state = applyCommand(reward.state, { type: 'step-forward' }).state;
+    expect(state.position).toEqual({ x: 3, y: 3 });
+
+    const shortcut = applyCommand(state, { type: 'interact' });
+    expect(shortcut.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-shortcut-1', interaction: 'shortcut' });
+    expect(shortcut.state.position).toEqual({ x: 1, y: 3 });
+    expect(shortcut.state.townDebt).toBe(2);
+  });
+
+  it('spends Underroot safety on each committed step', () => {
+    let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    expect(state.threatClock).toBe(0);
+
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    expect(state.position).toEqual({ x: 1, y: 4 });
+    expect(state.threatClock).toBe(1);
+
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    expect(state.position).toEqual({ x: 1, y: 3 });
+    expect(state.threatClock).toBe(2);
+
+    state = applyCommand({ ...state, facing: 'east' }, { type: 'step-forward' }).state;
+    expect(state.position).toEqual({ x: 2, y: 3 });
+    expect(state.threatClock).toBe(4);
+  });
+
+  it('settles placeholder debt in Marrowgate Sanctuary', () => {
+    const state = {
+      ...createTownState('m2-underroot'),
+      townDebt: 2,
+      completedInteractions: ['underroot-reward-1', 'underroot-shortcut-1'],
+    };
+
+    const result = applyCommand(state, { type: 'settle-debt' });
+
+    expect(result.state.mode).toBe('town');
+    expect(result.state.townService).toBe('sanctuary');
+    expect(result.state.townDebt).toBe(0);
+    expect(result.state.completedInteractions).toEqual(['underroot-reward-1', 'underroot-shortcut-1']);
+    expect(result.state.log.at(-1)).toContain('Sanctuary');
+  });
+
+  it('selects placeholder Marrowgate services without changing dive progress', () => {
+    const state = {
+      ...createTownState('m2-underroot'),
+      townDebt: 1,
+      completedInteractions: ['underroot-reward-1'],
+    };
+
+    const vellum = applyCommand(state, { type: 'choose-town-service', service: 'vellum' });
+    expect(vellum.state.townService).toBe('vellum');
+    expect(vellum.state.townDebt).toBe(1);
+    expect(vellum.state.completedInteractions).toEqual(['underroot-reward-1']);
+    expect(vellum.events).toContainEqual({ type: 'TOWN_SERVICE_SELECTED', service: 'vellum' });
+
+    const gate = applyCommand(vellum.state, { type: 'choose-town-service', service: 'gate' });
+    expect(gate.state.townService).toBe('gate');
+    expect(gate.events).toContainEqual({ type: 'TOWN_SERVICE_SELECTED', service: 'gate' });
+  });
+
+  it('returns to Marrowgate after the placeholder boss fight', () => {
+    let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    state = applyCommand({ ...state, position: { x: 1, y: 1 }, threat: 'hunted' }, { type: 'interact' }).state;
+    state = {
+      ...state,
+      combat: {
+        ...state.combat!,
+        enemy: { ...state.combat!.enemy, hp: 1 },
+      },
+    };
+    const cardId = state.combat!.hand[0]!;
+
+    const result = applyCommand(state, { type: 'play-card', cardId });
+
+    expect(result.state.mode).toBe('town');
+    expect(result.state.combat).toBeNull();
+    expect(result.state.completedInteractions).toContain('underroot-boss-1');
+    expect(result.events).toContainEqual({ type: 'MARROWGATE_RETURNED' });
+  });
+
+  it('returns to Underroot exploration after a normal placeholder fight', () => {
+    let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    state = applyCommand({ ...state, position: { x: 0, y: 4 }, threat: 'hunted' }, { type: 'interact' }).state;
+    expect(state.mode).toBe('combat');
+    expect(state.activeInteractionId).toBe('underroot-normal-1');
+    expect(state.combatReturn).toBe('explore');
+    state = {
+      ...state,
+      combat: {
+        ...state.combat!,
+        enemy: { ...state.combat!.enemy, hp: 1 },
+      },
+    };
+    const cardId = state.combat!.hand[0]!;
+
+    const result = applyCommand(state, { type: 'play-card', cardId });
+
+    expect(result.state.mode).toBe('explore');
+    expect(result.state.combat).toBeNull();
+    expect(result.state.completedInteractions).toContain('underroot-normal-1');
+    expect(result.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-normal-1', interaction: 'combat' });
+    expect(result.events).not.toContainEqual({ type: 'MARROWGATE_RETURNED' });
+  });
 });
+
+function reachableTileKeys(floor: FloorDef): Set<string> {
+  const reachable = new Set<string>();
+  const frontier = [floor.start];
+
+  while (frontier.length > 0) {
+    const coord = frontier.shift()!;
+    const key = tileKey(coord);
+    if (reachable.has(key)) continue;
+    reachable.add(key);
+
+    for (const next of neighbors(coord)) {
+      if (!floor.tiles.some((tile) => tile.walkable && tileKey(tile.coord) === tileKey(next))) continue;
+      frontier.push(next);
+    }
+  }
+
+  return reachable;
+}
+
+function neighbors(coord: TileCoord): TileCoord[] {
+  return [
+    { x: coord.x, y: coord.y - 1 },
+    { x: coord.x + 1, y: coord.y },
+    { x: coord.x, y: coord.y + 1 },
+    { x: coord.x - 1, y: coord.y },
+  ];
+}
+
+function tileKey(coord: TileCoord): string {
+  return `${coord.x},${coord.y}`;
+}

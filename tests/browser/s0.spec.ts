@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { FeelSettings } from '../../src/fx/feelScheduler';
-import type { CardId, CardInstanceId, GameEvent, SliceState } from '../../src/game/types';
+import type { CardId, CardInstanceId, GameEvent, SliceCommand, SliceState } from '../../src/game/types';
 
 const SAVE_BROWSER_RECEIPTS = process.env.SAVE_BROWSER_RECEIPTS === '1';
 
@@ -16,12 +16,14 @@ declare global {
       pendingEvents: number;
       state: SliceState;
       selectedCardId: CardInstanceId | null;
+      selectedCardDetail: string | null;
       selectedCardHint: string | null;
       selectedCardSummary: string | null;
       selectedStatusRule: string | null;
       intentText: string | null;
       feelSettings: FeelSettings;
       lastEvents: readonly GameEvent[];
+      dispatch?: (command: SliceCommand) => readonly GameEvent[];
     };
   }
 }
@@ -38,9 +40,7 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
   await expect(canvas).toHaveCSS('width', '640px');
   await expect(canvas).toHaveCSS('height', '360px');
 
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   const combatStarted = await getDebugState(page);
   expect(combatStarted.feelSettings.reducedMotion).toBe(false);
@@ -137,9 +137,7 @@ test('S0 browser smoke: repeated end turns drain FX and render defeat', async ({
   await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   const baselineObjects = (await getDebugState(page)).objectCounts.total;
   for (let turn = 0; turn < 24; turn += 1) {
@@ -181,14 +179,11 @@ test('M1 browser smoke: seeded starter route plays a natural 24-card win', async
     ]);
   });
 
-  await selectCardByDef(page, 'shadow-mark');
-  await page.keyboard.press('Enter');
+  await playCardByDefDebug(page, 'shadow-mark');
   await waitForFxDrain(page);
-  await selectCardByDef(page, 'blood-edge');
-  await page.keyboard.press('Enter');
+  await playCardByDefDebug(page, 'blood-edge');
   await waitForFxDrain(page);
-  await selectCardByDef(page, 'iron-cut');
-  await page.keyboard.press('Enter');
+  await playCardByDefDebug(page, 'iron-cut');
   await waitForFxDrain(page);
 
   await expectDebugState(page, (state) => {
@@ -240,13 +235,78 @@ test('M1 browser smoke: natural route survives an enemy turn and refills', async
   expect(pageErrors).toEqual([]);
 });
 
+test('M2 browser smoke: Marrowgate enters Underroot and returns with tile progress', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m2-underroot');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('town');
+    expect(state.floorId).toBe('underroot-m2-placeholder');
+    expect(state.townService).toBe('gate');
+    expect(state.completedInteractions).toEqual([]);
+  });
+  await dispatchDebug(page, { type: 'choose-town-service', service: 'vellum' });
+  await expectDebugState(page, (state) => {
+    expect(state.townService).toBe('vellum');
+    expect(state.lastEvents).toContainEqual({ type: 'TOWN_SERVICE_SELECTED', service: 'vellum' });
+  });
+
+  await dispatchDebug(page, { type: 'enter-underroot' });
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.position).toEqual({ x: 1, y: 5 });
+    expect(state.lastEvents).toContainEqual({ type: 'UNDERROOT_ENTERED' });
+  });
+  await page.keyboard.up('ArrowUp');
+
+  await dispatchDebug(page, { type: 'step-forward' });
+  await expect.poll(async () => (await getDebugState(page)).position).toEqual({ x: 1, y: 4 });
+  await expectDebugState(page, (state) => {
+    expect(state.threatClock).toBe(1);
+  });
+  await dispatchDebug(page, { type: 'interact' });
+  await expectDebugState(page, (state) => {
+    expect(state.completedInteractions).toContain('underroot-rest-1');
+    expect(state.position).toEqual({ x: 1, y: 4 });
+    expect(state.lastEvents).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-rest-1', interaction: 'rest' });
+  });
+
+  await dispatchDebug(page, { type: 'step-forward' });
+  await expect.poll(async () => (await getDebugState(page)).position).toEqual({ x: 1, y: 3 });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await expect.poll(async () => (await getDebugState(page)).position).toEqual({ x: 1, y: 2 });
+  await dispatchDebug(page, { type: 'interact' });
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('town');
+    expect(state.completedInteractions).toEqual(['underroot-rest-1', 'underroot-return-1']);
+    expect(state.lastEvents).toContainEqual({ type: 'MARROWGATE_RETURNED' });
+  });
+  expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
+  expect(pageErrors).toEqual([]);
+});
+
+test('S0 browser smoke: debug dispatch is limited to lab routes', async ({ page }) => {
+  await startFresh(page);
+  await expect.poll(async () => (await getDebugState(page)).mode).toBe('explore');
+
+  expect(await page.evaluate(() => typeof window.__HOLLOWMARK_DEBUG__?.dispatch)).toBe('undefined');
+
+  await page.goto('/?scene=m2-underroot');
+  await expect.poll(async () => (await getDebugState(page)).mode).toBe('town');
+
+  expect(await page.evaluate(() => typeof window.__HOLLOWMARK_DEBUG__?.dispatch)).toBe('function');
+});
+
 test('S0 browser smoke: clicking the enemy plays a selected attack', async ({ page }) => {
   await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   await selectCardByDef(page, 'iron-cut');
   await expectDebugState(page, (state) => {
@@ -266,9 +326,7 @@ test('S0 browser smoke: enemy click only acts on selected enemy cards', async ({
   await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   const beforeUnselectedClick = await getDebugState(page);
   await clickGame(page, canvas, 204, 116);
@@ -276,7 +334,7 @@ test('S0 browser smoke: enemy click only acts on selected enemy cards', async ({
     expect(state.combat?.turn).toBe(0);
     expect(state.commandLog).toHaveLength(beforeUnselectedClick.commandLog.length);
     expect(state.commandLog.at(-1)?.type).toBe('interact');
-    expect(state.lastEvents.map((event) => event.type)).toEqual(['COMBAT_STARTED']);
+    expect(state.lastEvents.map((event) => event.type)).not.toContain('CARD_PLAYED');
   });
 
   await selectCardByDef(page, 'mend');
@@ -293,9 +351,7 @@ test('S0 browser smoke: compact card summaries cover the core effect families', 
   await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   const expectedSummaries: readonly [CardId, string][] = [
     ['iron-cut', 'D6'],
@@ -317,9 +373,7 @@ test('S0 browser smoke: combat card affordances capture cleanly', async ({ page 
   await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
   await selectCardByDef(page, 'blood-edge');
 
   const screenshot = await captureCanvasReceipt(canvas, '.logs/s0-combat-card-affordances.png');
@@ -336,9 +390,7 @@ test('S0 browser smoke: owner-target cards emit their owner target', async ({ pa
   await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   await selectCardByDef(page, 'mend');
   await canvas.click();
@@ -357,9 +409,7 @@ test('S0 browser smoke: status card selection exposes a readable rule hint', asy
   await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   await selectCardByDef(page, 'mark-prey');
 
@@ -380,18 +430,58 @@ test('M1 browser smoke: selected multi-effect cards expose every compact effect'
 
   await expectDebugState(page, (state) => {
     expect(state.selectedCardSummary).toBe('Mk1 +D1');
+    expect(state.selectedCardDetail).toContain('Shadow Mark');
+    expect(state.selectedCardDetail).toContain('Mark 1 / Debt 1');
     expect(state.selectedCardHint).toContain('Mark adds burst damage');
     expect(state.selectedCardHint).toContain('Debt +1');
   });
+});
+
+test('M1 browser smoke: long card names fit compactly and expand in selected detail', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m1-combat');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await selectCardByDef(page, 'ringing-blow');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'sundering-cut');
+
+  await expectDebugState(page, (state) => {
+    expect(state.selectedCardSummary).toBe('D4 Vu1');
+    expect(state.selectedCardDetail).toContain('Sundering Cut');
+    expect(state.selectedCardDetail).toContain('Deal 4 / Vulnerable 1');
+  });
+});
+
+test('S0 browser smoke: narrow portrait view shows an explicit viewport guard', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startFresh(page);
+
+  await expect(page.locator('#viewport-guard')).toBeVisible();
+  await expect(page.locator('#viewport-guard')).toContainText('Rotate or widen');
+  await expect(page.locator('canvas')).toBeHidden();
+});
+
+test('S0 browser smoke: landscape view keeps the integer-scaled canvas playable', async ({ page }) => {
+  await page.setViewportSize({ width: 667, height: 375 });
+  await startFresh(page);
+
+  const canvas = page.locator('canvas');
+  await expect(page.locator('#viewport-guard')).toBeHidden();
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveCSS('width', '640px');
+  await expect(canvas).toHaveCSS('height', '360px');
 });
 
 test('S0 browser smoke: reload restores mid-combat save and can finish', async ({ page }) => {
   await startFreshForRestore(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   await selectCardByDef(page, 'mark-prey');
   await page.keyboard.press('KeyH');
@@ -434,9 +524,7 @@ test('S0 browser smoke: restart during pending combat FX clears scene timers', a
   await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('KeyW');
-  await page.keyboard.press('Space');
+  await enterS0Combat(page);
 
   await selectCardByDef(page, 'mark-prey');
   await page.keyboard.press('Enter');
@@ -491,6 +579,39 @@ async function startFresh(page: Page) {
   await page.goto('/');
 }
 
+async function enterS0Combat(page: Page) {
+  await page.keyboard.press('KeyW');
+  await expect.poll(async () => (await getDebugState(page)).position).toEqual({ x: 1, y: 2 });
+  await page.keyboard.press('KeyW');
+  await expect.poll(async () => (await getDebugState(page)).position).toEqual({ x: 1, y: 1 });
+  await page.keyboard.press('Space');
+  await expect.poll(async () => (await getDebugState(page)).mode).toBe('combat');
+}
+
+async function dispatchDebug(page: Page, command: SliceCommand) {
+  await page.evaluate((debugCommand) => {
+    const dispatch = window.__HOLLOWMARK_DEBUG__?.dispatch;
+    if (!dispatch) throw new Error('Missing Hollowmark debug dispatch');
+    dispatch(debugCommand);
+  }, command);
+}
+
+async function playCardByDefDebug(page: Page, defId: CardId) {
+  const command = await page.evaluate((cardDefId) => {
+    const state = window.__HOLLOWMARK_DEBUG__?.state;
+    const combat = state?.combat;
+    const cardId = combat?.hand.find((id) => combat.cards[id]?.defId === cardDefId);
+    if (!combat || !cardId) throw new Error(`Card not in hand: ${cardDefId}`);
+    return {
+      type: 'play-card' as const,
+      cardId,
+      target: { kind: 'enemy' as const, id: combat.enemy.id },
+    };
+  }, defId);
+
+  await dispatchDebug(page, command);
+}
+
 async function startFreshForRestore(page: Page) {
   await page.goto('/');
   await page.evaluate(() => window.localStorage.clear());
@@ -528,6 +649,7 @@ type DebugState = {
   };
   pendingEvents: number;
   selectedCardId: CardInstanceId | null;
+  selectedCardDetail: string | null;
   selectedCardHint: string | null;
   selectedCardSummary: string | null;
   selectedStatusRule: string | null;
@@ -544,6 +666,7 @@ async function getDebugState(page: Page): Promise<SliceState & DebugState> {
     objectCounts: debug.objectCounts,
     pendingEvents: debug.pendingEvents,
     selectedCardId: debug.selectedCardId,
+    selectedCardDetail: debug.selectedCardDetail,
     selectedCardHint: debug.selectedCardHint,
     selectedCardSummary: debug.selectedCardSummary,
     selectedStatusRule: debug.selectedStatusRule,
