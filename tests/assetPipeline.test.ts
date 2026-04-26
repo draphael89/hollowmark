@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { PLACEHOLDER_ASSETS } from '../src/assets/manifest';
+import { galleryAssetsFromManifest } from '../src/assets/manifest';
 
 type AssetPassport = {
   id: string;
@@ -18,12 +18,13 @@ describe('asset production foundation', () => {
   it('keeps public asset passports aligned with the visual gallery contracts', () => {
     const manifest = readAssetManifest();
     const publicIds = manifest.assets.map((asset) => asset.id);
-    const galleryIds = PLACEHOLDER_ASSETS.map((asset) => asset.id);
+    const galleryAssets = galleryAssetsFromManifest(manifest);
+    const galleryIds = galleryAssets.map((asset) => asset.id);
 
     expect(publicIds).toEqual(galleryIds);
     expect(new Set(publicIds).size).toBe(publicIds.length);
-    expect(manifest.assets.map((asset) => asset.title)).toEqual(PLACEHOLDER_ASSETS.map((asset) => asset.title));
-    expect(manifest.assets.map((asset) => asset.reviewFocus)).toEqual(PLACEHOLDER_ASSETS.map((asset) => asset.reviewFocus));
+    expect(manifest.assets.map((asset) => asset.title)).toEqual(galleryAssets.map((asset) => asset.title));
+    expect(manifest.assets.map((asset) => asset.reviewFocus)).toEqual(galleryAssets.map((asset) => asset.reviewFocus));
   });
 
   it('tracks first-batch source candidates without gameplay wiring', () => {

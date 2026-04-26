@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { PLACEHOLDER_ASSETS } from '../src/assets/manifest';
+import { readFileSync } from 'node:fs';
+import { galleryAssetsFromManifest } from '../src/assets/manifest';
 
-describe('placeholder asset manifest', () => {
+describe('asset manifest', () => {
   it('keeps asset ids stable and unique for gallery review', () => {
-    const ids = PLACEHOLDER_ASSETS.map((asset) => asset.id);
+    const assets = readGalleryAssets();
+    const ids = assets.map((asset) => asset.id);
 
     expect(ids).toEqual([
       'underroot.corridor.placeholder',
@@ -15,8 +17,8 @@ describe('placeholder asset manifest', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('keeps draft entries as review contracts, not gameplay asset paths', () => {
-    for (const asset of PLACEHOLDER_ASSETS) {
+  it('derives gallery entries from public passports', () => {
+    for (const asset of readGalleryAssets()) {
       expect(asset.status).toBe('processed');
       expect(asset.id).toMatch(/^[a-z0-9.-]+\.placeholder$/);
       expect(asset.title.length).toBeGreaterThan(0);
@@ -26,3 +28,7 @@ describe('placeholder asset manifest', () => {
     }
   });
 });
+
+function readGalleryAssets() {
+  return galleryAssetsFromManifest(JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')));
+}
