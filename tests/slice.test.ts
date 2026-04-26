@@ -60,4 +60,45 @@ describe('mode-safe slice reducer', () => {
     expect(result.state.mode).toBe('defeat');
     expect(result.events.at(-1)).toEqual({ type: 'DEFEAT' });
   });
+
+  it('transitions to victory when poison kills the enemy during end turn', () => {
+    let state = createSliceState();
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'interact' }).state;
+    state = {
+      ...state,
+      combat: {
+        ...state.combat!,
+        enemy: {
+          ...state.combat!.enemy,
+          hp: 1,
+          statuses: { ...state.combat!.enemy.statuses, poison: 1 },
+        },
+      },
+    };
+
+    const result = applyCommand(state, { type: 'end-turn' });
+
+    expect(result.state.mode).toBe('victory');
+    expect(result.state.combat?.enemy.hp).toBe(0);
+    expect(result.events.at(-1)).toEqual({ type: 'VICTORY' });
+  });
+
+  it('rejects invalid explicit combat targets through the slice boundary', () => {
+    let state = createSliceState();
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'step-forward' }).state;
+    state = applyCommand(state, { type: 'interact' }).state;
+    const combat = state.combat!;
+    const ironCut = combat.hand.find((cardId) => combat.cards[cardId]?.defId === 'iron-cut');
+    if (!ironCut) throw new Error('Missing Iron Cut');
+
+    const result = applyCommand(state, { type: 'play-card', cardId: ironCut, target: { kind: 'hero', id: 'liese' } });
+
+    expect(result.state.mode).toBe('combat');
+    expect(result.state.combat).toBe(combat);
+    expect(result.state.commandLog.at(-1)).toEqual({ type: 'play-card', cardId: ironCut, target: { kind: 'hero', id: 'liese' } });
+    expect(result.events).toEqual([{ type: 'CARD_REJECTED', cardId: ironCut, reason: 'invalid-target', target: { kind: 'hero', id: 'liese' } }]);
+  });
 });

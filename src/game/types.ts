@@ -1,6 +1,7 @@
 export type Facing = 'north' | 'east' | 'south' | 'west';
 export type ThreatBand = 'calm' | 'uneasy' | 'hunted';
 export type SliceMode = 'explore' | 'combat' | 'victory' | 'defeat';
+export type FloorId = 's0-root-wolf-hallway';
 export type Brand<T, TBrand extends string> = T & { readonly __brand: TBrand };
 
 export type TileCoord = {
@@ -8,7 +9,27 @@ export type TileCoord = {
   y: number;
 };
 
+export type TilePurpose = 'start' | 'approach' | 'encounter' | 'side-path';
+
+export type FloorTile = Readonly<{
+  coord: TileCoord;
+  walkable: boolean;
+  threat: ThreatBand;
+  purpose: TilePurpose;
+  logLine: string;
+  visual: 'stone-hall' | 'root-arch' | 'side-passage';
+}>;
+
+export type FloorDef = Readonly<{
+  id: FloorId;
+  start: TileCoord;
+  startFacing: Facing;
+  tiles: readonly FloorTile[];
+}>;
+
 export type HeroId = 'liese' | 'eris' | 'mia' | 'robin';
+export type StatusId = 'poison' | 'bleed' | 'weak' | 'vulnerable' | 'mark' | 'ward';
+export type StatusStacks = Readonly<Record<StatusId, number>>;
 
 export type HeroState = {
   id: HeroId;
@@ -18,6 +39,7 @@ export type HeroState = {
   maxHp: number;
   block: number;
   debt: number;
+  statuses: StatusStacks;
 };
 
 export type EnemyState = {
@@ -26,44 +48,101 @@ export type EnemyState = {
   hp: number;
   maxHp: number;
   block: number;
-  marked: boolean;
+  statuses: StatusStacks;
   intent: EnemyIntent;
 };
 
-export type EnemyIntent = { type: 'attack'; target: HeroId; amount: number };
+export type EnemyIntent = Readonly<{ type: 'attack'; target: HeroId; amount: number }>;
 
-export type CardId = 'iron-cut' | 'hold-fast' | 'mend' | 'mark-prey' | 'blood-edge';
+export type CardId =
+  | 'iron-cut'
+  | 'hold-fast'
+  | 'mend'
+  | 'mark-prey'
+  | 'blood-edge'
+  | 'oath-ward'
+  | 'sundering-cut'
+  | 'stone-guard'
+  | 'ringing-blow'
+  | 'sanctuary-veil'
+  | 'quiet-rebuke'
+  | 'white-thread'
+  | 'mercy-cut'
+  | 'prayer-knot'
+  | 'glass-hex'
+  | 'rootfire'
+  | 'black-spark'
+  | 'venom-script'
+  | 'glass-pulse'
+  | 'barbed-shot'
+  | 'shadow-mark'
+  | 'needle-rain'
+  | 'marked-step'
+  | 'tripwire';
 export type CardInstanceId = Brand<string, 'CardInstanceId'>;
 
 export function cardInstanceId(value: string): CardInstanceId {
   return value as CardInstanceId;
 }
 
-export type CardDef = {
+export type CardDef = Readonly<{
   id: CardId;
   name: string;
   owner: HeroId;
   cost: number;
-  kind: 'damage' | 'block' | 'heal' | 'mark';
-  amount: number;
-  debt: number;
+  target: TargetRule;
+  effects: readonly CardEffect[];
   text: string;
-};
+}>;
 
 export type CardInstance = {
   id: CardInstanceId;
   defId: CardId;
 };
 
+export type ActorRef =
+  | { kind: 'hero'; id: HeroId }
+  | { kind: 'enemy'; id: string }
+  | { kind: 'system' };
+
+export type TargetRef =
+  | { kind: 'hero'; id: HeroId }
+  | { kind: 'enemy'; id: string };
+
+export type TargetRule =
+  | Readonly<{ type: 'enemy' }>
+  | Readonly<{ type: 'owner' }>;
+
+export type DamageTag = 'physical' | 'mark' | 'debt' | 'weak' | 'vulnerable' | 'poison' | 'bleed';
+
+export type CardEffect =
+  | Readonly<{ type: 'damage'; amount: number; tags: readonly DamageTag[] }>
+  | Readonly<{ type: 'gain-block'; amount: number }>
+  | Readonly<{ type: 'heal'; amount: number }>
+  | Readonly<{ type: 'apply-status'; status: StatusId; amount: number }>
+  | Readonly<{ type: 'gain-debt'; amount: number }>;
+
 export type CombatEvent =
-  | { type: 'DAMAGE'; amount: number; blocked: number; target: 'enemy' | HeroId }
-  | { type: 'BLOCK'; heroId: HeroId; amount: number }
-  | { type: 'HEAL'; heroId: HeroId; amount: number }
-  | { type: 'MARK' }
-  | { type: 'DEBT'; heroId: HeroId; amount: number }
+  | { type: 'CARD_PLAYED'; cardId: CardInstanceId; defId: CardId; owner: HeroId; cost: number; target: TargetRef }
+  | {
+      type: 'DAMAGE_DEALT';
+      source: ActorRef;
+      target: ActorRef;
+      amount: number;
+      blocked: number;
+      lethal: boolean;
+      tags: readonly DamageTag[];
+      cardId?: CardInstanceId;
+      defId?: CardId;
+    }
+  | { type: 'BLOCK_GAINED'; heroId: HeroId; amount: number; source: ActorRef; cardId?: CardInstanceId; defId?: CardId }
+  | { type: 'HEAL_APPLIED'; heroId: HeroId; amount: number; source: ActorRef; cardId?: CardInstanceId; defId?: CardId }
+  | { type: 'STATUS_APPLIED'; status: StatusId; amount: number; total: number; source: ActorRef; target: ActorRef; cardId?: CardInstanceId; defId?: CardId }
+  | { type: 'STATUS_CONSUMED'; status: StatusId; target: ActorRef; prevented: number }
+  | { type: 'DEBT_GAINED'; heroId: HeroId; amount: number; total: number; source: ActorRef; cardId?: CardInstanceId; defId?: CardId }
   | { type: 'CARD_DRAWN'; cardId: CardInstanceId; defId: CardId }
   | { type: 'CARD_HELD'; cardId: CardInstanceId; defId: CardId }
-  | { type: 'CARD_REJECTED'; cardId: string; reason: 'hold-slot-full' | 'missing-card' | 'not-enough-energy' }
+  | { type: 'CARD_REJECTED'; cardId: string; reason: 'hold-slot-full' | 'missing-card' | 'not-enough-energy' | 'invalid-target' | 'dead-target' | 'dead-owner'; target?: TargetRef }
   | { type: 'HAND_REFILLED'; count: number }
   | { type: 'ENEMY_TURN_ENDED' }
   | { type: 'ENEMY_TURN_STARTED' }
@@ -109,13 +188,14 @@ export type ExploreCommand =
 export type CombatCommand =
   | { type: 'hold-card'; cardId: CardInstanceId }
   | { type: 'end-turn' }
-  | { type: 'play-card'; cardId: CardInstanceId };
+  | { type: 'play-card'; cardId: CardInstanceId; target?: TargetRef };
 
 export type SliceCommand = ExploreCommand | CombatCommand;
 export type SliceCommandType = SliceCommand['type'];
 
 export type SliceState = {
   seed: string;
+  floorId: FloorId;
   mode: SliceMode;
   position: TileCoord;
   facing: Facing;

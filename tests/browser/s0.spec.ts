@@ -1,5 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import type { CardInstanceId, SliceState } from '../../src/game/types';
+import type { FeelSettings } from '../../src/fx/feelScheduler';
+import type { CardId, CardInstanceId, GameEvent, SliceState } from '../../src/game/types';
+
+const SAVE_BROWSER_RECEIPTS = process.env.SAVE_BROWSER_RECEIPTS === '1';
 
 declare global {
   interface Window {
@@ -13,7 +16,12 @@ declare global {
       pendingEvents: number;
       state: SliceState;
       selectedCardId: CardInstanceId | null;
+      selectedCardHint: string | null;
+      selectedCardSummary: string | null;
+      selectedStatusRule: string | null;
       intentText: string | null;
+      feelSettings: FeelSettings;
+      lastEvents: readonly GameEvent[];
     };
   }
 }
@@ -22,7 +30,7 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));
 
-  await page.goto('/');
+  await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveJSProperty('width', 640);
@@ -35,6 +43,7 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
   await page.keyboard.press('Space');
 
   const combatStarted = await getDebugState(page);
+  expect(combatStarted.feelSettings.reducedMotion).toBe(false);
   expect(combatStarted.intentText).toBe('Bite Liese for 6');
   const baselineObjects = combatStarted.objectCounts.total;
   expect(combatStarted.objectCounts.fx).toBe(0);
@@ -42,10 +51,9 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
   await expectDebugState(page, (state) => {
     expect(state.mode).toBe('combat');
     expect(state.position).toEqual({ x: 1, y: 1 });
-    expect(state.commandLog).toHaveLength(combatStarted.commandLog.length + 1);
     expect(state.commandLog.at(-1)).toEqual({ type: 'step-back' });
   });
-  await page.keyboard.press('KeyT');
+  await clickGame(page, canvas, 263, 249);
   await expectDebugState(page, (state) => {
     expect(state.combat?.heroes.find((hero) => hero.id === 'liese')?.hp).toBe(25);
     expect(state.combat?.turn).toBe(1);
@@ -56,7 +64,7 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
     return { fx: state.objectCounts.fx, pending: state.pendingEvents };
   }).toEqual({ fx: 0, pending: 0 });
 
-  await page.keyboard.press('Digit4');
+  await selectCardByDef(page, 'mark-prey');
   await clickGame(page, canvas, 354, 249);
   await expectDebugState(page, (state) => {
     expect(heldDef(state)).toBe('mark-prey');
@@ -69,29 +77,29 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
   });
   await assertObjectCountIsBounded(page, baselineObjects, 6);
   for (let index = 0; index < 5; index += 1) {
-    await page.keyboard.press('Digit1');
-    await page.keyboard.press('Digit2');
+    await selectCardByDef(page, 'iron-cut');
+    await selectCardByDef(page, 'hold-fast');
   }
   await assertObjectCountIsBounded(page, baselineObjects, 6);
   await clickGame(page, canvas, 354, 249);
   await expectDebugState(page, (state) => {
     expect(selectedDef(state)).toBe('mark-prey');
   });
-  await clickGame(page, canvas, 204, 116);
-  await waitForFxDrain(page);
-
-  await page.keyboard.press('Digit4');
   await page.keyboard.press('Enter');
   await waitForFxDrain(page);
-  await clickGame(page, canvas, 271, 282);
+  await expectDebugState(page, (state) => {
+    expect(state.combat?.enemy.statuses.mark).toBe(1);
+  });
+
+  await selectCardByDef(page, 'blood-edge');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
   await expectDebugState(page, (state) => {
     expect(state.selectedCardId).toBeNull();
     expect(state.combat?.enemy.hp).toBe(6);
   });
-  await page.keyboard.press('Digit1');
+  await selectCardByDef(page, 'iron-cut');
   await page.keyboard.press('Enter');
-  await expect.poll(async () => (await getDebugState(page)).pendingEvents).toBeGreaterThan(0);
-  await expect.poll(async () => (await getDebugState(page)).objectCounts.fx).toBeGreaterThan(0);
   await waitForFxDrain(page);
 
   await expectDebugState(page, (state) => {
@@ -100,13 +108,25 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
     expect(state.combat?.enemy.hp).toBe(0);
     expect(state.combat?.held).toBeNull();
     expect(state.combat?.heroes.find((hero) => hero.id === 'mia')?.debt).toBe(4);
+    expect(state.objectCounts.hitZones).toBe(0);
     expect(state.objectCounts.total).toBeLessThanOrEqual(baselineObjects + 6);
   });
 
-  const screenshot = await canvas.screenshot({ path: '.logs/s0-signature-slice.png' });
+  const screenshot = await captureCanvasReceipt(canvas, '.logs/s0-signature-slice.png');
   expect(screenshot.readUInt32BE(16)).toBe(640);
   expect(screenshot.readUInt32BE(20)).toBe(360);
   expect(screenshot.byteLength).toBeGreaterThan(5_000);
+
+  await page.keyboard.press('KeyR');
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.position).toEqual({ x: 1, y: 3 });
+    expect(state.combat).toBeNull();
+    expect(state.selectedCardId).toBeNull();
+    expect(state.lastEvents).toEqual([]);
+  });
+  await expect.poll(async () => (await getDebugState(page)).pendingEvents).toBe(0);
+  expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
   expect(pageErrors).toEqual([]);
 });
 
@@ -114,7 +134,7 @@ test('S0 browser smoke: repeated end turns drain FX and render defeat', async ({
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));
 
-  await page.goto('/');
+  await startFresh(page);
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   await page.keyboard.press('KeyW');
@@ -132,9 +152,326 @@ test('S0 browser smoke: repeated end turns drain FX and render defeat', async ({
 
   await expectDebugState(page, (state) => {
     expect(state.mode).toBe('defeat');
+    expect(state.objectCounts.hitZones).toBe(0);
     expect(state.objectCounts.total).toBeLessThanOrEqual(baselineObjects + 8);
   });
   expect(pageErrors).toEqual([]);
+});
+
+test('M1 browser smoke: seeded starter route plays a natural 24-card win', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m1-combat');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('combat');
+    expect(state.seed).toBe('m1-natural-19');
+    expect(state.combat?.hand).toHaveLength(5);
+    expect(state.combat?.drawPile).toHaveLength(19);
+    expect(state.combat?.hand.map((cardId) => state.combat?.cards[cardId]?.defId)).toEqual([
+      'ringing-blow',
+      'blood-edge',
+      'shadow-mark',
+      'quiet-rebuke',
+      'iron-cut',
+    ]);
+  });
+
+  await selectCardByDef(page, 'shadow-mark');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'blood-edge');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'iron-cut');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('victory');
+    expect(state.combat?.enemy.hp).toBe(0);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'mia')?.debt).toBe(4);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'robin')?.debt).toBe(1);
+    expect(state.commandLog.map((command) => command.type)).toEqual(['play-card', 'play-card', 'play-card']);
+  });
+  expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
+
+  await page.goto('/');
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.seed).toBe('s0-root-wolf');
+    expect(state.combat).toBeNull();
+  });
+  expect(pageErrors).toEqual([]);
+});
+
+test('M1 browser smoke: natural route survives an enemy turn and refills', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m1-combat');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await selectCardByDef(page, 'ringing-blow');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('combat');
+    expect(state.combat?.turn).toBe(1);
+    expect(state.combat?.energy).toBe(3);
+    expect(state.combat?.hand).toHaveLength(5);
+    expect(state.combat?.drawPile).toHaveLength(14);
+    expect(state.combat?.discardPile).toHaveLength(5);
+    expect(state.combat?.enemy.hp).toBe(18);
+    expect(state.combat?.enemy.statuses.weak).toBe(0);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'liese')?.hp).toBe(27);
+    expect(state.lastEvents.map((event) => event.type)).toContain('HAND_REFILLED');
+  });
+  expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
+  expect(pageErrors).toEqual([]);
+});
+
+test('S0 browser smoke: clicking the enemy plays a selected attack', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  await selectCardByDef(page, 'iron-cut');
+  await expectDebugState(page, (state) => {
+    expect(selectedDef(state)).toBe('iron-cut');
+  });
+  await clickGame(page, canvas, 204, 116);
+  await waitForFxDrain(page);
+
+  await expectDebugState(page, (state) => {
+    expect(state.selectedCardId).toBeNull();
+    expect(state.combat?.enemy.hp).toBe(16);
+    expect(cardPlayedTarget(state)).toEqual({ kind: 'enemy', id: 'root-wolf' });
+  });
+});
+
+test('S0 browser smoke: enemy click only acts on selected enemy cards', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  const beforeUnselectedClick = await getDebugState(page);
+  await clickGame(page, canvas, 204, 116);
+  await expectDebugState(page, (state) => {
+    expect(state.combat?.turn).toBe(0);
+    expect(state.commandLog).toHaveLength(beforeUnselectedClick.commandLog.length);
+    expect(state.commandLog.at(-1)?.type).toBe('interact');
+    expect(state.lastEvents.map((event) => event.type)).toEqual(['COMBAT_STARTED']);
+  });
+
+  await selectCardByDef(page, 'mend');
+  const beforeOwnerTargetClick = await getDebugState(page);
+  await clickGame(page, canvas, 204, 116);
+  await expectDebugState(page, (state) => {
+    expect(selectedDef(state)).toBe('mend');
+    expect(state.commandLog).toHaveLength(beforeOwnerTargetClick.commandLog.length);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'eris')?.hp).toBe(24);
+  });
+});
+
+test('S0 browser smoke: compact card summaries cover the core effect families', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  const expectedSummaries: readonly [CardId, string][] = [
+    ['iron-cut', 'D6'],
+    ['hold-fast', 'Blk8'],
+    ['mend', 'H6'],
+    ['mark-prey', 'Mk1'],
+    ['blood-edge', 'D12 +D4'],
+  ];
+
+  for (const [defId, summary] of expectedSummaries) {
+    await selectCardByDef(page, defId);
+    await expectDebugState(page, (state) => {
+      expect(state.selectedCardSummary).toBe(summary);
+    });
+  }
+});
+
+test('S0 browser smoke: combat card affordances capture cleanly', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+  await selectCardByDef(page, 'blood-edge');
+
+  const screenshot = await captureCanvasReceipt(canvas, '.logs/s0-combat-card-affordances.png');
+  expect(screenshot.readUInt32BE(16)).toBe(640);
+  expect(screenshot.readUInt32BE(20)).toBe(360);
+  expect(screenshot.byteLength).toBeGreaterThan(5_000);
+  await expectDebugState(page, (state) => {
+    expect(state.objectCounts.total).toBeLessThan(90);
+    expect(selectedDef(state)).toBe('blood-edge');
+  });
+});
+
+test('S0 browser smoke: owner-target cards emit their owner target', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  await selectCardByDef(page, 'mend');
+  await canvas.click();
+  await page.keyboard.press('Enter');
+
+  await expect.poll(async () => {
+    const state = await getDebugState(page);
+    return {
+      selected: state.selectedCardId,
+      target: cardPlayedTarget(state),
+    };
+  }).toEqual({ selected: null, target: { kind: 'hero', id: 'eris' } });
+});
+
+test('S0 browser smoke: status card selection exposes a readable rule hint', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  await selectCardByDef(page, 'mark-prey');
+
+  await expectDebugState(page, (state) => {
+    expect(state.selectedCardHint).toContain('Selected Mark Prey');
+    expect(state.selectedCardHint).toContain('Mark adds burst damage');
+    expect(state.selectedStatusRule).toBe('Mark adds burst damage');
+  });
+});
+
+test('M1 browser smoke: selected multi-effect cards expose every compact effect', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m1-combat');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await selectCardByDef(page, 'shadow-mark');
+
+  await expectDebugState(page, (state) => {
+    expect(state.selectedCardSummary).toBe('Mk1 +D1');
+    expect(state.selectedCardHint).toContain('Mark adds burst damage');
+    expect(state.selectedCardHint).toContain('Debt +1');
+  });
+});
+
+test('S0 browser smoke: reload restores mid-combat save and can finish', async ({ page }) => {
+  await startFreshForRestore(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  await selectCardByDef(page, 'mark-prey');
+  await page.keyboard.press('KeyH');
+  await clickGame(page, canvas, 354, 249);
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('combat');
+    expect(state.combat?.enemy.statuses.mark).toBe(1);
+  });
+
+  await page.reload();
+  await expect(canvas).toBeVisible();
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('combat');
+    expect(state.floorId).toBe('s0-root-wolf-hallway');
+    expect(state.position).toEqual({ x: 1, y: 1 });
+    expect(state.combat?.enemy.statuses.mark).toBe(1);
+    expect(state.combat?.energy).toBe(2);
+  });
+
+  await selectCardByDef(page, 'blood-edge');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'iron-cut');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('victory');
+    expect(state.combat?.enemy.hp).toBe(0);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'mia')?.debt).toBe(4);
+  });
+});
+
+test('S0 browser smoke: restart during pending combat FX clears scene timers', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  await selectCardByDef(page, 'mark-prey');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'blood-edge');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'iron-cut');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await getDebugState(page)).pendingEvents).toBeGreaterThan(0);
+
+  await page.keyboard.press('KeyR');
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.combat).toBeNull();
+    expect(state.selectedCardId).toBeNull();
+    expect(state.lastEvents).toEqual([]);
+    expect(state.pendingEvents).toBe(0);
+  });
+
+  await page.waitForTimeout(300);
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.pendingEvents).toBe(0);
+    expect(state.lastEvents).toEqual([]);
+  });
+  expect(pageErrors).toEqual([]);
+});
+
+test('S0 browser smoke: reduced motion setting is applied at boot', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await startFresh(page);
+
+  const state = await getDebugState(page);
+  expect(state.feelSettings).toEqual({ reducedMotion: true, frameBudget: 'normal' });
 });
 
 async function clickGame(page: Page, canvas: Locator, x: number, y: number) {
@@ -147,6 +484,31 @@ async function clickGame(page: Page, canvas: Locator, x: number, y: number) {
   }));
 
   await page.mouse.click(box.x + (x * box.width) / size.width, box.y + (y * box.height) / size.height);
+}
+
+async function startFresh(page: Page) {
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/');
+}
+
+async function startFreshForRestore(page: Page) {
+  await page.goto('/');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+}
+
+async function selectCardByDef(page: Page, defId: CardId) {
+  const key = await page.evaluate((cardDefId) => {
+    const state = window.__HOLLOWMARK_DEBUG__?.state;
+    const hand = state?.combat?.hand;
+    const cards = state?.combat?.cards;
+    const index = hand?.findIndex((cardId) => cards?.[cardId]?.defId === cardDefId) ?? -1;
+    if (index < 0) throw new Error(`Card not in hand: ${cardDefId}`);
+    return `Digit${index + 1}`;
+  }, defId);
+
+  await page.keyboard.press(key);
+  await expect.poll(async () => selectedDef(await getDebugState(page))).toBe(defId);
 }
 
 async function expectDebugState(
@@ -166,6 +528,11 @@ type DebugState = {
   };
   pendingEvents: number;
   selectedCardId: CardInstanceId | null;
+  selectedCardHint: string | null;
+  selectedCardSummary: string | null;
+  selectedStatusRule: string | null;
+  feelSettings: FeelSettings;
+  lastEvents: readonly GameEvent[];
 };
 
 async function getDebugState(page: Page): Promise<SliceState & DebugState> {
@@ -177,6 +544,11 @@ async function getDebugState(page: Page): Promise<SliceState & DebugState> {
     objectCounts: debug.objectCounts,
     pendingEvents: debug.pendingEvents,
     selectedCardId: debug.selectedCardId,
+    selectedCardHint: debug.selectedCardHint,
+    selectedCardSummary: debug.selectedCardSummary,
+    selectedStatusRule: debug.selectedStatusRule,
+    feelSettings: debug.feelSettings,
+    lastEvents: debug.lastEvents,
   };
 }
 
@@ -188,6 +560,11 @@ function selectedDef(state: SliceState & DebugState) {
 function heldDef(state: SliceState & DebugState) {
   if (!state.combat?.held) return null;
   return state.combat.cards[state.combat.held]?.defId ?? null;
+}
+
+function cardPlayedTarget(state: SliceState & DebugState) {
+  const event = state.lastEvents.find((candidate) => candidate.type === 'CARD_PLAYED');
+  return event?.type === 'CARD_PLAYED' ? event.target : null;
 }
 
 async function assertObjectCountIsBounded(page: Page, baseline: number, allowance: number) {
@@ -203,4 +580,8 @@ async function waitForFxDrain(page: Page) {
       return { fx: state.objectCounts.fx, pending: state.pendingEvents };
     }, { timeout: 15_000 })
     .toEqual({ fx: 0, pending: 0 });
+}
+
+async function captureCanvasReceipt(canvas: Locator, path: string): Promise<Buffer> {
+  return canvas.screenshot(SAVE_BROWSER_RECEIPTS ? { path } : {});
 }

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import './style.css';
-import { GAME_HEIGHT, GAME_WIDTH } from './game/constants';
-import { S0Scene } from './scenes/S0Scene';
+import { GAME_HEIGHT, GAME_WIDTH } from './game/layout';
+import { THEME } from './game/theme';
+import { sceneRouteFromLocation, scenesForRoute } from './scenes/sceneRouting';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = '<div id="game-root"></div>';
 
@@ -10,14 +11,14 @@ const config: Phaser.Types.Core.GameConfig = {
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
   parent: 'game-root',
-  backgroundColor: '#08080f',
+  backgroundColor: THEME.text.void,
   pixelArt: true,
   roundPixels: true,
   scale: {
     mode: Phaser.Scale.NONE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [S0Scene],
+  scene: scenesForRoute(sceneRouteFromLocation(window.location)),
 };
 
 new Phaser.Game(config);

@@ -1,0 +1,40 @@
+export const MOTION = {
+  fx: {
+    bumpMs: 100,
+    cardPlayMs: 80,
+    damageDelayMs: 60,
+    damageFloatMs: 420,
+    debtDelayMs: 120,
+    stepToneMs: 65,
+    turnToneMs: 45,
+  },
+  eventSpacing: {
+    damageMs: 80,
+    debtMs: 60,
+    victoryMs: 120,
+  },
+  camera: {
+    stepPanDownMs: 70,
+    stepPanReturnMs: 90,
+    stepBobPx: 2,
+    bumpShakeIntensity: 0.006,
+    damageShakeMs: 130,
+    damageShakeIntensity: 0.006,
+  },
+  text: {
+    floatFontSize: '14px',
+    largeFloatFontSize: '16px',
+    floatDriftY: -20,
+  },
+  audio: {
+    facingToneHz: 180,
+    cardSelectToneHz: 260,
+    cardSelectMs: 35,
+    movedToneHz: 96,
+    bumpedToneHz: 62,
+    bumpedToneMs: 90,
+    damageToneHz: 120,
+    damageToneMs: 80,
+    squareGain: 0.025,
+  },
+} as const;

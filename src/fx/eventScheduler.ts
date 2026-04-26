@@ -1,15 +1,8 @@
 import type Phaser from 'phaser';
+import { MOTION } from '../game/motion';
 import type { GameEvent } from '../game/types';
 
-export const FX_TIMING = {
-  bumpMs: 100,
-  cardPlayMs: 80,
-  damageDelayMs: 60,
-  damageFloatMs: 420,
-  debtDelayMs: 120,
-  stepToneMs: 65,
-  turnToneMs: 45,
-} as const;
+export const FX_TIMING = MOTION.fx;
 
 export type EventHandler = (event: GameEvent) => void;
 
@@ -17,6 +10,7 @@ export class EventScheduler {
   private readonly scene: Phaser.Scene;
   private pending = 0;
   private cursorMs = 0;
+  private readonly timers: Phaser.Time.TimerEvent[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -30,30 +24,46 @@ export class EventScheduler {
     for (const event of events) {
       const delay = this.cursorMs + delayFor(event);
       this.pending += 1;
-      this.scene.time.delayedCall(delay, () => {
+      const timer = this.scene.time.delayedCall(delay, () => {
         this.pending -= 1;
+        this.forgetTimer(timer);
         handle(event);
       });
+      this.timers.push(timer);
       this.cursorMs = delay + spacingAfter(event);
     }
 
     if (this.cursorMs > 0) {
-      this.scene.time.delayedCall(this.cursorMs, () => {
+      const timer = this.scene.time.delayedCall(this.cursorMs, () => {
+        this.forgetTimer(timer);
         if (this.pending === 0) this.cursorMs = 0;
       });
+      this.timers.push(timer);
     }
+  }
+
+  reset(): void {
+    for (const timer of this.timers) timer.remove(false);
+    this.timers.length = 0;
+    this.pending = 0;
+    this.cursorMs = 0;
+  }
+
+  private forgetTimer(timer: Phaser.Time.TimerEvent): void {
+    const index = this.timers.indexOf(timer);
+    if (index >= 0) this.timers.splice(index, 1);
   }
 }
 
 function delayFor(event: GameEvent): number {
-  if (event.type === 'DAMAGE') return FX_TIMING.damageDelayMs;
-  if (event.type === 'DEBT') return FX_TIMING.debtDelayMs;
+  if (event.type === 'DAMAGE_DEALT') return FX_TIMING.damageDelayMs;
+  if (event.type === 'DEBT_GAINED') return FX_TIMING.debtDelayMs;
   return 0;
 }
 
 function spacingAfter(event: GameEvent): number {
-  if (event.type === 'DAMAGE') return 80;
-  if (event.type === 'DEBT') return 60;
-  if (event.type === 'VICTORY') return 120;
+  if (event.type === 'DAMAGE_DEALT') return MOTION.eventSpacing.damageMs;
+  if (event.type === 'DEBT_GAINED') return MOTION.eventSpacing.debtMs;
+  if (event.type === 'VICTORY') return MOTION.eventSpacing.victoryMs;
   return 0;
 }
