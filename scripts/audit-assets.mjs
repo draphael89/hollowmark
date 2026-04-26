@@ -6,8 +6,10 @@ const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const required = [
   'id',
   'kind',
+  'title',
   'biome',
   'promptPath',
+  'reviewFocus',
   'sourceInputs',
   'rawSource',
   'processedPath',
