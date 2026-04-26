@@ -6,6 +6,8 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite",
+    "asset:audit": "node scripts/audit-assets.mjs",
+    "asset:contact-sheet": "node scripts/create-contact-sheet.mjs",
     "test": "vitest run tests/*.test.ts",
     "test:browser": "playwright test",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",

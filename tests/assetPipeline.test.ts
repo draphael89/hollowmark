@@ -5,7 +5,9 @@ import { PLACEHOLDER_ASSETS } from '../src/assets/manifest';
 type AssetPassport = {
   id: string;
   kind: string;
+  title: string;
   promptPath: string;
+  reviewFocus: string;
   rawSource: string | null;
   processedPath: string | null;
   finalSize: { w: number; h: number };
@@ -20,6 +22,8 @@ describe('asset production foundation', () => {
 
     expect(publicIds).toEqual(galleryIds);
     expect(new Set(publicIds).size).toBe(publicIds.length);
+    expect(manifest.assets.map((asset) => asset.title)).toEqual(PLACEHOLDER_ASSETS.map((asset) => asset.title));
+    expect(manifest.assets.map((asset) => asset.reviewFocus)).toEqual(PLACEHOLDER_ASSETS.map((asset) => asset.reviewFocus));
   });
 
   it('keeps first-batch prompt files ready without raw generated assets', () => {
@@ -27,6 +31,8 @@ describe('asset production foundation', () => {
 
     for (const asset of manifest.assets) {
       expect(asset.approvalState).toBe('placeholder');
+      expect(asset.title.length).toBeGreaterThan(0);
+      expect(asset.reviewFocus.length).toBeGreaterThan(0);
       expect(asset.rawSource).toBeNull();
       expect(asset.processedPath).toBeNull();
       expect(asset.finalSize.w).toBeGreaterThan(0);
