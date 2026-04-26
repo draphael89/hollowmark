@@ -49,6 +49,9 @@ export class CombatSandboxScene extends Phaser.Scene {
   private deckSeedIndex = 0;
   private labCombat: CombatState = createCombatWithCards('sandbox-m1-0', M1_STARTER_CARDS);
   private floatLane = 0;
+  private readonly cueTimers: Phaser.Time.TimerEvent[] = [];
+  private hitStopUntil = 0;
+  private hitStopTimeout: number | null = null;
 
   constructor() {
     super('CombatSandboxScene');
@@ -70,6 +73,8 @@ export class CombatSandboxScene extends Phaser.Scene {
     });
     this.input.keyboard?.on('keydown-ENTER', () => this.playSelectedLabCard());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.clearCueTimers();
+      this.clearHitStop();
       this.audioContext?.close();
       this.audioContext = null;
     });
@@ -77,6 +82,8 @@ export class CombatSandboxScene extends Phaser.Scene {
   }
 
   private trigger(cue: CueButton): void {
+    this.clearCueTimers();
+    this.clearHitStop();
     this.lastCue = cue.label;
     this.floatLane = 0;
     this.statusLabel.setText(`Last: ${this.lastCue}`);
@@ -86,6 +93,8 @@ export class CombatSandboxScene extends Phaser.Scene {
   }
 
   private previewNextDeck(): void {
+    this.clearCueTimers();
+    this.clearHitStop();
     this.deckSeedIndex += 1;
     this.labCombat = createCombatWithCards(`sandbox-m1-${this.deckSeedIndex}`, M1_STARTER_CARDS);
     const preview = m1DeckPreview(this.labCombat);
@@ -158,6 +167,8 @@ export class CombatSandboxScene extends Phaser.Scene {
   }
 
   private applyLabResult(label: string, events: readonly CombatEvent[]): void {
+    this.clearCueTimers();
+    this.clearHitStop();
     this.lastCue = label;
     this.floatLane = 0;
     this.lastEvents = events.map(eventLabel).slice(-10);
@@ -182,7 +193,7 @@ export class CombatSandboxScene extends Phaser.Scene {
     this.label('7 M1 deck', 440, 66 + cues.length * 22, text.cyan);
     this.label('8 Play first', 440, 66 + (cues.length + 1) * 22, text.cyan);
     this.label('9 End turn', 440, 66 + (cues.length + 2) * 22, text.cyan);
-    this.label('Q-T play hand', 440, 66 + (cues.length + 3) * 22, text.cyan);
+    this.label('Q-T select  Enter play', 440, 66 + (cues.length + 3) * 22, text.cyan);
     this.label('H Hold first', 440, 66 + (cues.length + 4) * 22, text.cyan);
     this.label('0 Status stack', 440, 66 + (cues.length + 5) * 22, text.cyan);
     this.deckLabel = this.add.text(44, 64, deckPreviewText(m1DeckPreview(this.labCombat), this.labCombat, this.selectedSlot), { ...textStyle, color: text.bone, lineSpacing: 4 });
@@ -227,7 +238,11 @@ export class CombatSandboxScene extends Phaser.Scene {
 
   private playCombatEvents(events: readonly CombatEvent[]): void {
     events.forEach((event, index) => {
-      this.time.delayedCall(index * SANDBOX_EVENT_STAGGER_MS, () => this.playCombatEvent(event));
+      const timer = this.time.delayedCall(index * SANDBOX_EVENT_STAGGER_MS, () => {
+        this.forgetCueTimer(timer);
+        this.playCombatEvent(event);
+      });
+      this.cueTimers.push(timer);
     });
   }
 
@@ -237,8 +252,16 @@ export class CombatSandboxScene extends Phaser.Scene {
       return;
     }
     if (cue.type === 'hit-stop') {
+      const deadline = window.performance.now() + cue.durationMs;
+      if (deadline <= this.hitStopUntil) return;
+      this.hitStopUntil = deadline;
       this.time.timeScale = 0.001;
-      window.setTimeout(() => { this.time.timeScale = 1; }, cue.durationMs);
+      if (this.hitStopTimeout !== null) window.clearTimeout(this.hitStopTimeout);
+      this.hitStopTimeout = window.setTimeout(() => {
+        this.time.timeScale = 1;
+        this.hitStopUntil = 0;
+        this.hitStopTimeout = null;
+      }, cue.durationMs);
       return;
     }
     if (cue.type === 'float-text') {
@@ -276,6 +299,23 @@ export class CombatSandboxScene extends Phaser.Scene {
     gain.connect(this.audioContext.destination);
     oscillator.start();
     oscillator.stop(this.audioContext.currentTime + durationMs / 1000);
+  }
+
+  private clearCueTimers(): void {
+    for (const timer of this.cueTimers) timer.remove(false);
+    this.cueTimers.length = 0;
+  }
+
+  private forgetCueTimer(timer: Phaser.Time.TimerEvent): void {
+    const index = this.cueTimers.indexOf(timer);
+    if (index >= 0) this.cueTimers.splice(index, 1);
+  }
+
+  private clearHitStop(): void {
+    if (this.hitStopTimeout !== null) window.clearTimeout(this.hitStopTimeout);
+    this.hitStopTimeout = null;
+    this.hitStopUntil = 0;
+    this.time.timeScale = 1;
   }
 
   private label(value: string, x: number, y: number, color: string): void {

@@ -255,6 +255,41 @@ describe('S0 combat', () => {
     expect(result.events).toContainEqual(expect.objectContaining({ type: 'DAMAGE_DEALT', lethal: true }));
   });
 
+  it('does not apply later target-bound effects to an enemy killed earlier in the card', () => {
+    const barbedDef = M1_CARDS.find((candidate) => candidate.id === 'barbed-shot');
+    if (!barbedDef) throw new Error('Missing Barbed Shot definition');
+    const combat = createCombatWithCards('lethal-status', [barbedDef]);
+    const barbedShot = card(combat, 'barbed-shot');
+    const nearDeadEnemy = { ...combat, enemy: { ...combat.enemy, hp: 3 } };
+
+    const result = playCard(nearDeadEnemy, barbedShot);
+
+    expect(result.combat.enemy.hp).toBe(0);
+    expect(result.combat.enemy.statuses.bleed).toBe(0);
+    expect(result.events).toEqual([
+      expect.objectContaining({ type: 'CARD_PLAYED', defId: 'barbed-shot' }),
+      expect.objectContaining({ type: 'DAMAGE_DEALT', lethal: true }),
+      { type: 'VICTORY' },
+    ]);
+  });
+
+  it('still resolves explicit debt costs after lethal damage', () => {
+    const combat = createCombat('test-seed');
+    const bloodEdge = card(combat, 'blood-edge');
+    const nearDeadEnemy = { ...combat, enemy: { ...combat.enemy, hp: 12 } };
+
+    const result = playCard(nearDeadEnemy, bloodEdge);
+
+    expect(result.combat.enemy.hp).toBe(0);
+    expect(result.combat.heroes.find((hero) => hero.id === 'mia')?.debt).toBe(4);
+    expect(result.events).toEqual([
+      expect.objectContaining({ type: 'CARD_PLAYED', defId: 'blood-edge' }),
+      expect.objectContaining({ type: 'DAMAGE_DEALT', lethal: true }),
+      expect.objectContaining({ type: 'DEBT_GAINED', heroId: 'mia', amount: 4 }),
+      { type: 'VICTORY' },
+    ]);
+  });
+
   it('consumes Mark through the shared status stacks after bonus damage', () => {
     const combat = createCombat('test-seed');
     const marked = playCard(combat, card(combat, 'mark-prey')).combat;
@@ -402,6 +437,26 @@ describe('S0 combat', () => {
     expect(wrongOwner.combat).toBe(combat);
     expect(wrongOwner.events).toEqual([{ type: 'CARD_REJECTED', cardId: holdFast, reason: 'invalid-target', target: { kind: 'hero', id: 'eris' } }]);
     expect(deadEnemy.events).toEqual([{ type: 'CARD_REJECTED', cardId: ironCut, reason: 'dead-target', target: { kind: 'enemy', id: 'root-wolf' } }]);
+  });
+
+  it('rejects cards played by downed owners before spending energy or moving cards', () => {
+    const combat = createCombat('test-seed');
+    const bloodEdge = card(combat, 'blood-edge');
+    const downedMia = {
+      ...combat,
+      heroes: combat.heroes.map((hero) => (hero.id === 'mia' ? { ...hero, hp: 0 } : hero)),
+    };
+
+    const result = playCard(downedMia, bloodEdge);
+
+    expect(result.events).toEqual([{ type: 'CARD_REJECTED', cardId: bloodEdge, reason: 'dead-owner' }]);
+    expect(result.combat.energy).toBe(downedMia.energy);
+    expect(result.combat.hand).toEqual(downedMia.hand);
+    expect(result.combat.discardPile).toEqual(downedMia.discardPile);
+    expect(result.combat.held).toBe(downedMia.held);
+    expect(result.combat.heroes.find((hero) => hero.id === 'mia')).toEqual(
+      downedMia.heroes.find((hero) => hero.id === 'mia'),
+    );
   });
 
   it('resolves default targets for every S0 card definition', () => {
@@ -800,6 +855,23 @@ describe('S0 combat', () => {
     expect(drawn.hand.at(-1)).toBe(extra);
     expect(drawn.drawPile).toEqual([]);
     expect(cardDefFor(drawn, extra).id).toBe('iron-cut');
+  });
+
+  it('recycles the discard pile when an M1 hand refill exhausts the draw pile', () => {
+    const combat = createCombatWithCards('m1-exhaustion', M1_STARTER_CARDS);
+    const discardPile = [...combat.hand, ...combat.drawPile.slice(0, 2)];
+    const exhausted: CombatState = {
+      ...combat,
+      hand: [],
+      drawPile: [],
+      discardPile,
+    };
+
+    const drawn = drawToHand(exhausted, 5);
+
+    expect(drawn.hand).toEqual(discardPile.slice(0, 5));
+    expect(drawn.drawPile).toEqual(discardPile.slice(5));
+    expect(drawn.discardPile).toEqual([]);
   });
 });
 

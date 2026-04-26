@@ -142,7 +142,7 @@ export type CombatEvent =
   | { type: 'DEBT_GAINED'; heroId: HeroId; amount: number; total: number; source: ActorRef; cardId?: CardInstanceId; defId?: CardId }
   | { type: 'CARD_DRAWN'; cardId: CardInstanceId; defId: CardId }
   | { type: 'CARD_HELD'; cardId: CardInstanceId; defId: CardId }
-  | { type: 'CARD_REJECTED'; cardId: string; reason: 'hold-slot-full' | 'missing-card' | 'not-enough-energy' | 'invalid-target' | 'dead-target'; target?: TargetRef }
+  | { type: 'CARD_REJECTED'; cardId: string; reason: 'hold-slot-full' | 'missing-card' | 'not-enough-energy' | 'invalid-target' | 'dead-target' | 'dead-owner'; target?: TargetRef }
   | { type: 'HAND_REFILLED'; count: number }
   | { type: 'ENEMY_TURN_ENDED' }
   | { type: 'ENEMY_TURN_STARTED' }

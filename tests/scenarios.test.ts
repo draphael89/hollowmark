@@ -96,6 +96,7 @@ describe('golden combat scenarios', () => {
     expect(report.metrics.energySpent).toBe(2);
     expect(report.state.combat?.heroes.find((hero) => hero.id === 'mia')?.debt).toBe(4);
     expect(report.state.combat?.enemy.hp).toBe(6);
+    expect(report.verdict.gates).toContainEqual({ label: 'debt is taken willingly', passed: true });
   });
 
   it('records enemy intent exposure for preview scenarios', () => {
@@ -116,6 +117,10 @@ describe('golden combat scenarios', () => {
     expect(report.metrics.damageTaken).toBe(0);
     expect(report.metrics.debtGained).toBe(0);
     expect(report.events).toContainEqual(expect.objectContaining({ type: 'STATUS_CONSUMED', status: 'ward' }));
+    expect(report.verdict.gates).toEqual(expect.arrayContaining([
+      { label: 'ward prevents damage', passed: true },
+      { label: 'ward is consumed', passed: true },
+    ]));
   });
 
   it('measures M1 poison as a lethal pre-intent clock', () => {
@@ -130,6 +135,10 @@ describe('golden combat scenarios', () => {
       tags: ['poison'],
       lethal: true,
     }));
+    expect(report.verdict.gates).toEqual(expect.arrayContaining([
+      { label: 'poison wins before intent', passed: true },
+      { label: 'poison is lethal', passed: true },
+    ]));
   });
 
   it('measures M1 bleed payoff as extra physical damage', () => {
@@ -141,6 +150,7 @@ describe('golden combat scenarios', () => {
       type: 'DAMAGE_DEALT',
       tags: ['physical', 'bleed'],
     }));
+    expect(report.verdict.gates).toContainEqual({ label: 'bleed adds payoff damage', passed: true });
   });
 
   it('measures M1 bad shuffle recovery as a debt comeback line', () => {

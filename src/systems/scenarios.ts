@@ -227,7 +227,7 @@ export function runScenario(id: ScenarioId): ScenarioReport {
     state: run.state,
     events: run.events,
     metrics,
-    verdict: scenarioVerdict(def.id, run.kind, metrics),
+    verdict: scenarioVerdict(def.id, run.kind, metrics, run.events),
   };
 }
 
@@ -427,8 +427,8 @@ function card(combat: CombatState, defId: CardId) {
   return cardId;
 }
 
-function scenarioVerdict(id: ScenarioId, kind: ScenarioVerdict['kind'], metrics: ScenarioMetrics): ScenarioVerdict {
-  const gates = scenarioGates(id, kind, metrics);
+function scenarioVerdict(id: ScenarioId, kind: ScenarioVerdict['kind'], metrics: ScenarioMetrics, events: readonly GameEvent[]): ScenarioVerdict {
+  const gates = scenarioGates(id, kind, metrics, events);
   const failed = gates.filter((gate) => !gate.passed).length;
   return {
     kind,
@@ -437,12 +437,13 @@ function scenarioVerdict(id: ScenarioId, kind: ScenarioVerdict['kind'], metrics:
   };
 }
 
-function scenarioGates(id: ScenarioId, kind: ScenarioVerdict['kind'], metrics: ScenarioMetrics): readonly ScenarioGate[] {
+function scenarioGates(id: ScenarioId, kind: ScenarioVerdict['kind'], metrics: ScenarioMetrics, events: readonly GameEvent[]): readonly ScenarioGate[] {
   const basic = [
     gate('has commands', metrics.commands > 0),
     gate('has plays', metrics.cardsPlayed > 0),
   ];
-  if (kind === 'fixture') return [...basic, gate('fixture, not shuffle proof', true)];
+  const specific = scenarioSpecificGates(id, metrics, events);
+  if (kind === 'fixture') return [...basic, gate('fixture, not shuffle proof', true), ...specific];
 
   if (id === 'm1-bad-shuffle-recovery') {
     return [
@@ -457,8 +458,40 @@ function scenarioGates(id: ScenarioId, kind: ScenarioVerdict['kind'], metrics: S
 
   return [
     ...basic,
+    ...specific,
     gate('stays readable', metrics.noChoiceTurns <= 1),
   ];
+}
+
+function scenarioSpecificGates(id: ScenarioId, metrics: ScenarioMetrics, events: readonly GameEvent[]): readonly ScenarioGate[] {
+  if (id === 'corruption-bargain') return [gate('debt is taken willingly', metrics.debtGained >= 4)];
+  if (id === 'm1-ward-save') {
+    return [
+      gate('ward prevents damage', metrics.damageTaken === 0),
+      gate('ward is consumed', events.some((event) => event.type === 'STATUS_CONSUMED' && event.status === 'ward')),
+    ];
+  }
+  if (id === 'm1-poison-lethal') {
+    return [
+      gate('poison wins before intent', metrics.outcome === 'victory' && metrics.damageTaken === 0),
+      gate('poison is lethal', events.some((event) =>
+        event.type === 'DAMAGE_DEALT' &&
+        event.source.kind === 'system' &&
+        event.target.kind === 'enemy' &&
+        event.tags.includes('poison') &&
+        event.lethal,
+      )),
+    ];
+  }
+  if (id === 'm1-bleed-payoff') {
+    return [gate('bleed adds payoff damage', events.some((event) =>
+      event.type === 'DAMAGE_DEALT' &&
+      event.target.kind === 'enemy' &&
+      event.tags.includes('bleed') &&
+      event.amount > 0,
+    ))];
+  }
+  return [];
 }
 
 function gate(label: string, passed: boolean): ScenarioGate {

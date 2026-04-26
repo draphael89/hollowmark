@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { FeelSettings } from '../../src/fx/feelScheduler';
 import type { CardId, CardInstanceId, GameEvent, SliceState } from '../../src/game/types';
 
+const SAVE_BROWSER_RECEIPTS = process.env.SAVE_BROWSER_RECEIPTS === '1';
+
 declare global {
   interface Window {
     __HOLLOWMARK_DEBUG__?: {
@@ -15,6 +17,7 @@ declare global {
       state: SliceState;
       selectedCardId: CardInstanceId | null;
       selectedCardHint: string | null;
+      selectedCardSummary: string | null;
       selectedStatusRule: string | null;
       intentText: string | null;
       feelSettings: FeelSettings;
@@ -109,7 +112,7 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
     expect(state.objectCounts.total).toBeLessThanOrEqual(baselineObjects + 6);
   });
 
-  const screenshot = await canvas.screenshot({ path: '.logs/s0-signature-slice.png' });
+  const screenshot = await captureCanvasReceipt(canvas, '.logs/s0-signature-slice.png');
   expect(screenshot.readUInt32BE(16)).toBe(640);
   expect(screenshot.readUInt32BE(20)).toBe(360);
   expect(screenshot.byteLength).toBeGreaterThan(5_000);
@@ -120,6 +123,7 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
     expect(state.position).toEqual({ x: 1, y: 3 });
     expect(state.combat).toBeNull();
     expect(state.selectedCardId).toBeNull();
+    expect(state.lastEvents).toEqual([]);
   });
   await expect.poll(async () => (await getDebugState(page)).pendingEvents).toBe(0);
   expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
@@ -258,6 +262,57 @@ test('S0 browser smoke: clicking the enemy plays a selected attack', async ({ pa
   });
 });
 
+test('S0 browser smoke: enemy click only acts on selected enemy cards', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  const beforeUnselectedClick = await getDebugState(page);
+  await clickGame(page, canvas, 204, 116);
+  await expectDebugState(page, (state) => {
+    expect(state.combat?.turn).toBe(0);
+    expect(state.commandLog).toHaveLength(beforeUnselectedClick.commandLog.length);
+    expect(state.commandLog.at(-1)?.type).toBe('interact');
+    expect(state.lastEvents.map((event) => event.type)).toEqual(['COMBAT_STARTED']);
+  });
+
+  await selectCardByDef(page, 'mend');
+  const beforeOwnerTargetClick = await getDebugState(page);
+  await clickGame(page, canvas, 204, 116);
+  await expectDebugState(page, (state) => {
+    expect(selectedDef(state)).toBe('mend');
+    expect(state.commandLog).toHaveLength(beforeOwnerTargetClick.commandLog.length);
+    expect(state.combat?.heroes.find((hero) => hero.id === 'eris')?.hp).toBe(24);
+  });
+});
+
+test('S0 browser smoke: compact card summaries cover the core effect families', async ({ page }) => {
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  const expectedSummaries: readonly [CardId, string][] = [
+    ['iron-cut', 'D6'],
+    ['hold-fast', 'Blk8'],
+    ['mend', 'H6'],
+    ['mark-prey', 'Mk1'],
+    ['blood-edge', 'D12 +D4'],
+  ];
+
+  for (const [defId, summary] of expectedSummaries) {
+    await selectCardByDef(page, defId);
+    await expectDebugState(page, (state) => {
+      expect(state.selectedCardSummary).toBe(summary);
+    });
+  }
+});
+
 test('S0 browser smoke: combat card affordances capture cleanly', async ({ page }) => {
   await startFresh(page);
   const canvas = page.locator('canvas');
@@ -267,7 +322,7 @@ test('S0 browser smoke: combat card affordances capture cleanly', async ({ page 
   await page.keyboard.press('Space');
   await selectCardByDef(page, 'blood-edge');
 
-  const screenshot = await canvas.screenshot({ path: '.logs/s0-combat-card-affordances.png' });
+  const screenshot = await captureCanvasReceipt(canvas, '.logs/s0-combat-card-affordances.png');
   expect(screenshot.readUInt32BE(16)).toBe(640);
   expect(screenshot.readUInt32BE(20)).toBe(360);
   expect(screenshot.byteLength).toBeGreaterThan(5_000);
@@ -315,6 +370,21 @@ test('S0 browser smoke: status card selection exposes a readable rule hint', asy
   });
 });
 
+test('M1 browser smoke: selected multi-effect cards expose every compact effect', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m1-combat');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await selectCardByDef(page, 'shadow-mark');
+
+  await expectDebugState(page, (state) => {
+    expect(state.selectedCardSummary).toBe('Mk1 +D1');
+    expect(state.selectedCardHint).toContain('Mark adds burst damage');
+    expect(state.selectedCardHint).toContain('Debt +1');
+  });
+});
+
 test('S0 browser smoke: reload restores mid-combat save and can finish', async ({ page }) => {
   await startFreshForRestore(page);
   const canvas = page.locator('canvas');
@@ -355,6 +425,45 @@ test('S0 browser smoke: reload restores mid-combat save and can finish', async (
     expect(state.combat?.enemy.hp).toBe(0);
     expect(state.combat?.heroes.find((hero) => hero.id === 'mia')?.debt).toBe(4);
   });
+});
+
+test('S0 browser smoke: restart during pending combat FX clears scene timers', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await startFresh(page);
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('KeyW');
+  await page.keyboard.press('Space');
+
+  await selectCardByDef(page, 'mark-prey');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'blood-edge');
+  await page.keyboard.press('Enter');
+  await waitForFxDrain(page);
+  await selectCardByDef(page, 'iron-cut');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await getDebugState(page)).pendingEvents).toBeGreaterThan(0);
+
+  await page.keyboard.press('KeyR');
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.combat).toBeNull();
+    expect(state.selectedCardId).toBeNull();
+    expect(state.lastEvents).toEqual([]);
+    expect(state.pendingEvents).toBe(0);
+  });
+
+  await page.waitForTimeout(300);
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.pendingEvents).toBe(0);
+    expect(state.lastEvents).toEqual([]);
+  });
+  expect(pageErrors).toEqual([]);
 });
 
 test('S0 browser smoke: reduced motion setting is applied at boot', async ({ page }) => {
@@ -420,6 +529,7 @@ type DebugState = {
   pendingEvents: number;
   selectedCardId: CardInstanceId | null;
   selectedCardHint: string | null;
+  selectedCardSummary: string | null;
   selectedStatusRule: string | null;
   feelSettings: FeelSettings;
   lastEvents: readonly GameEvent[];
@@ -435,6 +545,7 @@ async function getDebugState(page: Page): Promise<SliceState & DebugState> {
     pendingEvents: debug.pendingEvents,
     selectedCardId: debug.selectedCardId,
     selectedCardHint: debug.selectedCardHint,
+    selectedCardSummary: debug.selectedCardSummary,
     selectedStatusRule: debug.selectedStatusRule,
     feelSettings: debug.feelSettings,
     lastEvents: debug.lastEvents,
@@ -469,4 +580,8 @@ async function waitForFxDrain(page: Page) {
       return { fx: state.objectCounts.fx, pending: state.pendingEvents };
     }, { timeout: 15_000 })
     .toEqual({ fx: 0, pending: 0 });
+}
+
+async function captureCanvasReceipt(canvas: Locator, path: string): Promise<Buffer> {
+  return canvas.screenshot(SAVE_BROWSER_RECEIPTS ? { path } : {});
 }

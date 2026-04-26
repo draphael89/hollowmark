@@ -110,6 +110,11 @@ describe('versioned saves', () => {
       ok: false,
       error: 'Save state is invalid.',
     });
+    expect(() => deserializeSave({ version: 1, state: { ...createSliceState(), floorId: 'toString' } })).not.toThrow();
+    expect(deserializeSave({ version: 1, state: { ...createSliceState(), floorId: 'toString' } })).toEqual({
+      ok: false,
+      error: 'Save state is invalid.',
+    });
   });
 
   it('rejects saves with impossible floor positions or threat bands', () => {

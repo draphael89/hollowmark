@@ -12,5 +12,5 @@ export function floorForId(id: FloorId): FloorDef {
 }
 
 export function isFloorId(value: string): value is FloorId {
-  return value in floors;
+  return Object.hasOwn(floors, value);
 }

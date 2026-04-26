@@ -26,6 +26,7 @@ export class EventScheduler {
       this.pending += 1;
       const timer = this.scene.time.delayedCall(delay, () => {
         this.pending -= 1;
+        this.forgetTimer(timer);
         handle(event);
       });
       this.timers.push(timer);
@@ -34,6 +35,7 @@ export class EventScheduler {
 
     if (this.cursorMs > 0) {
       const timer = this.scene.time.delayedCall(this.cursorMs, () => {
+        this.forgetTimer(timer);
         if (this.pending === 0) this.cursorMs = 0;
       });
       this.timers.push(timer);
@@ -45,6 +47,11 @@ export class EventScheduler {
     this.timers.length = 0;
     this.pending = 0;
     this.cursorMs = 0;
+  }
+
+  private forgetTimer(timer: Phaser.Time.TimerEvent): void {
+    const index = this.timers.indexOf(timer);
+    if (index >= 0) this.timers.splice(index, 1);
   }
 }
 

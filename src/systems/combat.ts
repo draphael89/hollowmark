@@ -79,6 +79,13 @@ export function playCard(combat: CombatState, cardId: CardInstanceId, target?: T
     };
   }
 
+  if (heroById(combat.heroes, card.owner).hp <= 0) {
+    return {
+      combat,
+      events: [{ type: 'CARD_REJECTED', cardId, reason: 'dead-owner' }],
+    };
+  }
+
   const resolvedTarget = target ?? defaultTargetFor(combat, card);
   const targetResult = validateTarget(combat, card, resolvedTarget);
   if (!targetResult.ok) {
@@ -132,6 +139,7 @@ function resolveCardEffects(combat: CombatState, cardId: CardInstanceId, card: C
   const events: CombatEvent[] = [cardPlayed(cardId, card, target)];
 
   for (const effect of card.effects) {
+    if (targetIsDead(next, target) && effect.type !== 'gain-debt') continue;
     const result = applyCardEffect(next, cardId, card, target, effect);
     next = result.combat;
     events.push(...result.events);
@@ -165,6 +173,11 @@ function applyCardEffect(
   if (effect.type === 'apply-status') return applyStatusEffect(combat, cardId, card, target, effect);
   if (effect.type === 'gain-debt') return applyDebtEffect(combat, cardId, card, effect);
   return assertNever(effect);
+}
+
+function targetIsDead(combat: CombatState, target: TargetRef): boolean {
+  if (target.kind === 'enemy') return combat.enemy.hp <= 0;
+  return heroById(combat.heroes, target.id).hp <= 0;
 }
 
 function applyDamageEffect(

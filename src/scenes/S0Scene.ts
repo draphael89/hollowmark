@@ -26,6 +26,7 @@ declare global {
       state: SliceState;
       selectedCardId: CardInstanceId | null;
       selectedCardHint: string | null;
+      selectedCardSummary: string | null;
       selectedStatusRule: string | null;
       intentText: string | null;
       feelSettings: FeelSettings;
@@ -56,6 +57,7 @@ export class S0Scene extends Phaser.Scene {
   private fx!: Phaser.GameObjects.Group;
   private hitZones!: Phaser.GameObjects.Group;
   private hitStopUntil = 0;
+  private hitStopTimeout: number | null = null;
   private lastEvents: readonly GameEvent[] = [];
 
   constructor() {
@@ -81,6 +83,7 @@ export class S0Scene extends Phaser.Scene {
     ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'].forEach((key, index) => {
       this.input.keyboard?.on(`keydown-${key}`, () => this.selectCard(index));
     });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shutdownScene());
 
     this.syncFromState();
   }
@@ -121,9 +124,9 @@ export class S0Scene extends Phaser.Scene {
     if (!isM1CombatRoute(window.location)) clearSavedState();
     this.eventScheduler.reset();
     this.fx.clear(true, true);
-    this.time.timeScale = 1;
-    this.hitStopUntil = 0;
+    this.clearHitStop();
     this.selectedCardId = null;
+    this.lastEvents = [];
     this.state = initialStateForLocation(window.location);
     this.syncFromState();
   }
@@ -284,7 +287,7 @@ export class S0Scene extends Phaser.Scene {
     if (enemyStatuses) this.label(enemyStatuses, combatLayout.enemyStatus.x, combatLayout.enemyStatus.y, text.gold);
     this.label(renderIntentText(combat.enemy.intent), combatLayout.enemyIntent.x, combatLayout.enemyIntent.y, text.red);
     if (this.state.mode === 'combat') {
-      this.zone(combatLayout.enemyHitBox.x, combatLayout.enemyHitBox.y, combatLayout.enemyHitBox.w, combatLayout.enemyHitBox.h, () => this.playSelected());
+      this.zone(combatLayout.enemyHitBox.x, combatLayout.enemyHitBox.y, combatLayout.enemyHitBox.w, combatLayout.enemyHitBox.h, () => this.playSelectedOnEnemy());
     }
 
     if (this.state.mode === 'victory') this.label('VICTORY: the command log can replay this slice.', combatLayout.victoryLabel.x, combatLayout.victoryLabel.y, text.cyan);
@@ -429,9 +432,9 @@ export class S0Scene extends Phaser.Scene {
   private selectedCardHint(): string {
     if (!this.selectedCardId || !this.state.combat) return 'Select card, click enemy/Hold, or T/Enter to end turn';
     const card = cardDefFor(this.state.combat, this.selectedCardId);
-    const rule = this.selectedStatusRule();
-    const statusHint = rule ? `     ${rule}` : '';
-    return `Selected ${card.name}     ${this.targetHint(card)}${statusHint}`;
+    const effectHints = selectedEffectHints(card);
+    const hint = effectHints.length > 0 ? `     ${effectHints.join('     ')}` : '';
+    return `Selected ${card.name}     ${this.targetHint(card)}${hint}`;
   }
 
   private selectedStatusRule(): string | null {
@@ -516,6 +519,14 @@ export class S0Scene extends Phaser.Scene {
     this.dispatch({ type: 'play-card', cardId: this.selectedCardId, target });
   }
 
+  private playSelectedOnEnemy() {
+    if (!this.selectedCardId || this.state.mode !== 'combat') return;
+    const combat = this.assertCombat();
+    const card = cardDefFor(combat, this.selectedCardId);
+    if (card.target.type !== 'enemy') return;
+    this.dispatch({ type: 'play-card', cardId: this.selectedCardId, target: { kind: 'enemy', id: combat.enemy.id } });
+  }
+
   private endTurn() {
     if (this.state.mode !== 'combat') return;
     this.selectedCardId = null;
@@ -549,13 +560,22 @@ export class S0Scene extends Phaser.Scene {
 
   private hitStop(durationMs: number) {
     const deadline = window.performance.now() + durationMs;
+    if (deadline <= this.hitStopUntil) return;
     this.hitStopUntil = Math.max(this.hitStopUntil, deadline);
     this.time.timeScale = 0.001;
-    window.setTimeout(() => {
-      if (deadline < this.hitStopUntil) return;
+    if (this.hitStopTimeout !== null) window.clearTimeout(this.hitStopTimeout);
+    this.hitStopTimeout = window.setTimeout(() => {
       this.time.timeScale = 1;
       this.hitStopUntil = 0;
+      this.hitStopTimeout = null;
     }, durationMs);
+  }
+
+  private clearHitStop(): void {
+    if (this.hitStopTimeout !== null) window.clearTimeout(this.hitStopTimeout);
+    this.hitStopTimeout = null;
+    this.hitStopUntil = 0;
+    this.time.timeScale = 1;
   }
 
   private floatCue(cue: Extract<FeelCue, { type: 'float-text' }>) {
@@ -609,6 +629,13 @@ export class S0Scene extends Phaser.Scene {
     oscillator.stop(this.audioContext.currentTime + durationMs / 1000);
   }
 
+  private shutdownScene(): void {
+    this.eventScheduler.reset();
+    this.clearHitStop();
+    void this.audioContext?.close();
+    this.audioContext = null;
+  }
+
   private assertCombat() {
     if (!this.state.combat) throw new Error('Expected combat state');
     return this.state.combat;
@@ -623,9 +650,10 @@ export class S0Scene extends Phaser.Scene {
         hitZones: this.hitZones.getLength(),
       },
       pendingEvents: this.eventScheduler.getPendingCount(),
-      state: this.state,
+      state: structuredClone(this.state),
       selectedCardId: this.selectedCardId,
       selectedCardHint: this.selectedCardId ? this.selectedCardHint() : null,
+      selectedCardSummary: this.selectedCardId && this.state.combat ? cardSummary(cardDefFor(this.state.combat, this.selectedCardId)) : null,
       selectedStatusRule: this.selectedStatusRule(),
       intentText: this.state.combat ? renderIntentText(this.state.combat.enemy.intent) : null,
       feelSettings: this.feelSettings,
@@ -686,27 +714,32 @@ function targetCode(card: CardDef): string {
 }
 
 function cardSummary(card: CardDef): string {
-  const damage = card.effects.find((effect) => effect.type === 'damage');
-  const debt = card.effects.find((effect) => effect.type === 'gain-debt');
-  const block = card.effects.find((effect) => effect.type === 'gain-block');
-  const heal = card.effects.find((effect) => effect.type === 'heal');
-  const status = card.effects.find((effect) => effect.type === 'apply-status');
-
-  if (damage && debt) return `Deal ${damage.amount} +D${debt.amount}`;
-  if (damage) return `Deal ${damage.amount}`;
-  if (block) return `Block ${block.amount}`;
-  if (heal) return `Heal ${heal.amount}`;
-  if (status) return `Apply ${statusName(status.status)}`;
-  return card.text.split('\n')[0] ?? '';
+  return card.effects.map(effectSummary).join(' ') || (card.text.split('\n')[0] ?? '');
 }
 
-function statusName(status: StatusId): string {
-  if (status === 'poison') return 'Poison';
-  if (status === 'bleed') return 'Bleed';
-  if (status === 'weak') return 'Weak';
-  if (status === 'vulnerable') return 'Vuln';
-  if (status === 'mark') return 'Mark';
-  return 'Ward';
+function selectedEffectHints(card: CardDef): string[] {
+  return card.effects.flatMap((effect) => {
+    if (effect.type === 'apply-status') return [statusRule(effect.status)];
+    if (effect.type === 'gain-debt') return [`Debt +${effect.amount}`];
+    return [];
+  });
+}
+
+function effectSummary(effect: CardDef['effects'][number]): string {
+  if (effect.type === 'damage') return `D${effect.amount}`;
+  if (effect.type === 'gain-block') return `Blk${effect.amount}`;
+  if (effect.type === 'heal') return `H${effect.amount}`;
+  if (effect.type === 'apply-status') return `${statusCode(effect.status)}${effect.amount}`;
+  return `+D${effect.amount}`;
+}
+
+function statusCode(status: StatusId): string {
+  if (status === 'poison') return 'Po';
+  if (status === 'bleed') return 'Bl';
+  if (status === 'weak') return 'We';
+  if (status === 'vulnerable') return 'Vu';
+  if (status === 'mark') return 'Mk';
+  return 'Wd';
 }
 
 function loadSavedState(): SliceState {

@@ -9,6 +9,7 @@ declare global {
 }
 
 const routes: readonly DevSceneKey[] = ['combat-sandbox', 'dungeon-sandbox', 'visual-gallery', 'scenario-lab'];
+const SAVE_VISUAL_AUDITS = process.env.SAVE_VISUAL_AUDITS === '1';
 
 for (const route of routes) {
   test(`dev scene boots: ${route}`, async ({ page }) => {
@@ -288,7 +289,7 @@ test('dungeon sandbox exposes S0 view-slot review poses', async ({ page }) => {
 });
 
 test('visual audit receipts render S0 and dev scenes at 640x360', async ({ page }) => {
-  await mkdir('.logs/visual-audits', { recursive: true });
+  if (SAVE_VISUAL_AUDITS) await mkdir('.logs/visual-audits', { recursive: true });
   await page.addInitScript(() => window.localStorage.clear());
 
   const receipts: readonly { name: string; url: string }[] = [
@@ -303,7 +304,7 @@ test('visual audit receipts render S0 and dev scenes at 640x360', async ({ page 
     await page.goto(receipt.url);
     const canvas = page.locator('canvas');
     await expect(canvas).toBeVisible();
-    const screenshot = await canvas.screenshot({ path: `.logs/visual-audits/${receipt.name}.png` });
+    const screenshot = await canvas.screenshot(SAVE_VISUAL_AUDITS ? { path: `.logs/visual-audits/${receipt.name}.png` } : {});
     expect(screenshot.readUInt32BE(16)).toBe(640);
     expect(screenshot.readUInt32BE(20)).toBe(360);
     expect(screenshot.byteLength).toBeGreaterThan(2_000);
