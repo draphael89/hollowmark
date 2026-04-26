@@ -7,9 +7,10 @@ describe('placeholder asset manifest', () => {
 
     expect(ids).toEqual([
       'underroot.corridor.placeholder',
+      'underroot.combat.placeholder',
       'enemy.root-wolf.placeholder',
       'card.blood-edge.placeholder',
-      'ui.debt-mark.placeholder',
+      'ui.ornaments.placeholder',
     ]);
     expect(new Set(ids).size).toBe(ids.length);
   });

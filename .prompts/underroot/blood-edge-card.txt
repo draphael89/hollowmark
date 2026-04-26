@@ -1,0 +1,8 @@
+Create textless card art for a dark first-person dungeon-crawler deckbuilder.
+Card concept: Blood Edge - a strong attack that gives debt.
+Visual metaphor: a bone-white blade cutting through oxblood light, with a small root thread wrapping the hilt like a future cost.
+Class: Mage; use subtle forbidden-script and red-glint motifs.
+Composition: tight crop, strong silhouette, readable at tiny size, no UI frame, no text, no numbers.
+Style: moonlit oxblood dungeon manuscript; painterly pixel-art source for a 16-bit-inspired first-person dungeon RPG; high-contrast silhouettes; deep indigo shadows; bone-colored highlights; muted torch accents.
+Use: will be cropped to 64x48 inside a card frame.
+Avoid: readable lettering, modern symbols, bright saturated colors, detailed full battle scenes, anime style.

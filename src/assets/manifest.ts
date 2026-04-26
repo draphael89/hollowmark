@@ -15,6 +15,13 @@ export const PLACEHOLDER_ASSETS: readonly AssetManifestEntry[] = [
     reviewFocus: 'depth, tile read, no text',
   },
   {
+    id: 'underroot.combat.placeholder',
+    kind: 'background',
+    status: 'placeholder',
+    title: 'Underroot Combat',
+    reviewFocus: 'enemy contrast, floor contact, no text',
+  },
+  {
     id: 'enemy.root-wolf.placeholder',
     kind: 'sprite',
     status: 'placeholder',
@@ -29,10 +36,10 @@ export const PLACEHOLDER_ASSETS: readonly AssetManifestEntry[] = [
     reviewFocus: 'temptation, danger, crop safety',
   },
   {
-    id: 'ui.debt-mark.placeholder',
+    id: 'ui.ornaments.placeholder',
     kind: 'ui',
     status: 'placeholder',
-    title: 'Debt Mark',
-    reviewFocus: 'small-size read, palette restraint',
+    title: 'UI Ornaments',
+    reviewFocus: 'panel corners, status frames, palette restraint',
   },
 ];
