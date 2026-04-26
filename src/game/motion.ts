@@ -1,4 +1,10 @@
 export const MOTION = {
+  explore: {
+    forwardMs: 170,
+    backMs: 210,
+    turnMs: 130,
+    bumpMs: 100,
+  },
   fx: {
     bumpMs: 100,
     cardPlayMs: 80,

@@ -4,7 +4,7 @@ import { getInitialFeelSettings, planFeelCues, type FeelCue, type FeelSettings, 
 import { GAME_HEIGHT, GAME_WIDTH, S0_LAYOUT, SIDE_PANEL, TRAY, VIEWPORT } from '../game/layout';
 import { MOTION } from '../game/motion';
 import { THEME } from '../game/theme';
-import type { CardDef, CardInstanceId, CombatState, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId, TownCommand } from '../game/types';
+import type { CardDef, CardInstanceId, CombatState, ExploreCommand, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId, TownCommand } from '../game/types';
 import { M1_STARTER_CARDS } from '../data/combat';
 import { cardDefFor, createCombatWithCards, renderIntentText } from '../systems/combat';
 import { floorForId } from '../data/floors';
@@ -53,6 +53,7 @@ const COMPACT_CARD_NAMES: Record<string, string> = {
   'Sundering Cut': 'Sunde Cut',
   'Sanctuary Veil': 'Sanct Veil',
 };
+type ExploreMotionCommand = Extract<ExploreCommand, { type: 'step-forward' | 'step-back' | 'turn-left' | 'turn-right' }>;
 
 export class S0Scene extends Phaser.Scene {
   private state = createSliceState();
@@ -70,6 +71,8 @@ export class S0Scene extends Phaser.Scene {
   private hitZones!: Phaser.GameObjects.Group;
   private hitStopUntil = 0;
   private hitStopTimeout: number | null = null;
+  private exploreMotionTimer: Phaser.Time.TimerEvent | null = null;
+  private queuedExploreMotion: ExploreMotionCommand | null = null;
   private lastEvents: readonly GameEvent[] = [];
 
   constructor() {
@@ -79,14 +82,14 @@ export class S0Scene extends Phaser.Scene {
   create() {
     this.state = initialStateForLocation(window.location);
     this.buildViews();
-    this.bindKey('W', () => this.dispatch({ type: 'step-forward' }));
-    this.bindKey('UP', () => this.dispatch({ type: 'step-forward' }));
-    this.bindKey('S', () => this.dispatch({ type: 'step-back' }));
-    this.bindKey('DOWN', () => this.dispatch({ type: 'step-back' }));
-    this.bindKey('A', () => this.dispatch({ type: 'turn-left' }));
-    this.bindKey('LEFT', () => this.dispatch({ type: 'turn-left' }));
-    this.bindKey('D', () => this.dispatch({ type: 'turn-right' }));
-    this.bindKey('RIGHT', () => this.dispatch({ type: 'turn-right' }));
+    this.bindKey('W', () => this.handleExploreMotion({ type: 'step-forward' }));
+    this.bindKey('UP', () => this.handleExploreMotion({ type: 'step-forward' }));
+    this.bindKey('S', () => this.handleExploreMotion({ type: 'step-back' }));
+    this.bindKey('DOWN', () => this.handleExploreMotion({ type: 'step-back' }));
+    this.bindKey('A', () => this.handleExploreMotion({ type: 'turn-left' }));
+    this.bindKey('LEFT', () => this.handleExploreMotion({ type: 'turn-left' }));
+    this.bindKey('D', () => this.handleExploreMotion({ type: 'turn-right' }));
+    this.bindKey('RIGHT', () => this.handleExploreMotion({ type: 'turn-right' }));
     this.bindKey('SPACE', () => this.dispatch(this.state.mode === 'town' ? { type: 'enter-underroot' } : { type: 'interact' }));
     this.bindKey('G', () => this.dispatchTownCommand({ type: 'enter-underroot' }));
     this.bindKey('V', () => this.dispatchTownCommand({ type: 'choose-town-service', service: 'vellum' }));
@@ -129,6 +132,7 @@ export class S0Scene extends Phaser.Scene {
     const result = applyCommand(this.state, command);
     this.state = result.state;
     this.lastEvents = result.events;
+    if (this.state.mode !== 'explore') this.clearExploreMotion();
     if (!isLabRoute(window.location)) persistState(this.state);
 
     if (command.type === 'play-card') {
@@ -146,12 +150,46 @@ export class S0Scene extends Phaser.Scene {
     this.dispatch(command);
   }
 
+  private handleExploreMotion(command: ExploreMotionCommand): void {
+    if (this.state.mode !== 'explore') {
+      this.dispatch(command);
+      return;
+    }
+
+    if (this.exploreMotionTimer) {
+      if (!this.queuedExploreMotion) this.queuedExploreMotion = command;
+      return;
+    }
+
+    const events = this.dispatch(command);
+    const durationMs = exploreMotionDuration(command, events);
+    if (durationMs > 0) this.lockExploreMotion(durationMs);
+  }
+
+  private lockExploreMotion(durationMs: number): void {
+    this.exploreMotionTimer = this.time.delayedCall(durationMs, () => this.finishExploreMotion());
+  }
+
+  private finishExploreMotion(): void {
+    this.exploreMotionTimer = null;
+    const queued = this.queuedExploreMotion;
+    this.queuedExploreMotion = null;
+    if (queued && this.state.mode === 'explore') this.handleExploreMotion(queued);
+  }
+
+  private clearExploreMotion(): void {
+    this.queuedExploreMotion = null;
+    this.exploreMotionTimer?.remove(false);
+    this.exploreMotionTimer = null;
+  }
+
   private restartRun(): void {
     if (this.state.mode !== 'victory' && this.state.mode !== 'defeat') return;
     if (!isLabRoute(window.location)) clearSavedState();
     this.eventScheduler.reset();
     this.fx.clear(true, true);
     this.clearHitStop();
+    this.clearExploreMotion();
     this.selectedCardId = null;
     this.lastEvents = [];
     this.state = initialStateForLocation(window.location);
@@ -715,6 +753,7 @@ export class S0Scene extends Phaser.Scene {
   private shutdownScene(): void {
     this.eventScheduler.reset();
     this.clearHitStop();
+    this.clearExploreMotion();
     void this.audioContext?.close();
     this.audioContext = null;
   }
@@ -759,6 +798,15 @@ function pressureCue(state: SliceState): string {
   if (state.threatClock >= 8) return 'roots hunting';
   if (state.threatClock >= 4) return 'roots listening';
   return 'quiet pressure';
+}
+
+function exploreMotionDuration(command: ExploreMotionCommand, events: readonly GameEvent[]): number {
+  if (events.some((event) => event.type === 'STEP_BUMPED')) return MOTION.explore.bumpMs;
+  if (events.some((event) => event.type === 'STEP_MOVED')) {
+    return command.type === 'step-back' ? MOTION.explore.backMs : MOTION.explore.forwardMs;
+  }
+  if (events.some((event) => event.type === 'FACING_CHANGED')) return MOTION.explore.turnMs;
+  return 0;
 }
 
 function townServiceName(service: SliceState['townService']): string {
