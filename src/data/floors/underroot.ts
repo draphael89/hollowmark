@@ -93,7 +93,7 @@ export const UNDERROOT_M2_FLOOR: FloorDef = {
       },
     },
     {
-      coord: { x: 3, y: 2 },
+      coord: { x: 3, y: 3 },
       walkable: true,
       threat: 'uneasy',
       purpose: 'shortcut',
@@ -110,7 +110,7 @@ export const UNDERROOT_M2_FLOOR: FloorDef = {
         id: 'underroot-shortcut-1',
         to: { x: 1, y: 3 },
         debt: 1,
-        logLine: 'Roots draw blood for the shortcut and set you back on the main seam.',
+        logLine: 'Roots take blood and fold you back.',
       },
     },
     {
