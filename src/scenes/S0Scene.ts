@@ -1134,7 +1134,7 @@ function townServiceName(service: SliceState['townService']): string {
 function townHint(state: SliceState): string {
   if (state.townService === 'gate') return gateHint(state.townDebt);
   if (state.townService === 'vellum') return `Vellum deck ${M1_STARTER_CARDS.length} cards  ${vellumDeckCountsLine()}`;
-  return `Service ${townServiceName(state.townService)}   Sanctuary debt ${state.townDebt}`;
+  return sanctuaryHint(state.townDebt);
 }
 
 function townHintColor(state: SliceState): string {
@@ -1146,6 +1146,11 @@ function townHintColor(state: SliceState): string {
 function gateHint(townDebt: number): string {
   if (townDebt === 0) return 'Gate next dive: quiet stair';
   return `Gate next dive: ${debtPressureName(townDebt)} from D${townDebt}`;
+}
+
+function sanctuaryHint(townDebt: number): string {
+  if (townDebt === 0) return 'Sanctuary: no debt to settle';
+  return `Sanctuary: settle D${townDebt} for quiet stair`;
 }
 
 function debtPressureName(townDebt: number): string {
