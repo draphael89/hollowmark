@@ -438,6 +438,36 @@ test('M2 browser smoke: shortcut branch folds back to the main seam with debt', 
   expect(pageErrors).toEqual([]);
 });
 
+test('M2 browser smoke: hunting pressure sharpens the next bite', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m2-underroot');
+  await expect(page.locator('canvas')).toBeVisible();
+
+  await dispatchDebug(page, { type: 'enter-underroot' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'turn-right' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await expectDebugState(page, (state) => {
+    expect(state.position).toEqual({ x: 4, y: 3 });
+    expect(state.threatClock).toBeGreaterThanOrEqual(8);
+  });
+
+  await dispatchDebug(page, { type: 'interact' });
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('combat');
+    expect(state.intentText).toBe('Bite Liese for 8');
+    expect(state.combat?.enemy.intent).toEqual({ type: 'attack', target: 'liese', amount: 8 });
+    expect(state.log).toContain('The roots are hunting. The next bite sharpens.');
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test('M2 browser smoke: exploration keeps one buffered movement input', async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));

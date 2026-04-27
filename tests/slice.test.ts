@@ -275,6 +275,26 @@ describe('mode-safe slice reducer', () => {
     });
   });
 
+  it('turns hunting pressure into a sharper visible enemy bite', () => {
+    const result = applyCommand(
+      {
+        ...createTownState('m2-underroot'),
+        mode: 'explore' as const,
+        position: { x: 0, y: 3 },
+        threat: 'hunted' as const,
+        threatClock: 8,
+      },
+      { type: 'interact' },
+    );
+
+    expect(result.state.mode).toBe('combat');
+    expect(result.state.combat?.enemy.intent).toEqual({ type: 'attack', target: 'liese', amount: 8 });
+    expect(result.state.log.slice(-2)).toEqual([
+      'Something pale climbs out of the rootwell.',
+      'The roots are hunting. The next bite sharpens.',
+    ]);
+  });
+
   it('spends Underroot safety on each committed step', () => {
     let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
     expect(state.threatClock).toBe(0);

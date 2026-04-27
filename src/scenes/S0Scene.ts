@@ -429,7 +429,7 @@ export class S0Scene extends Phaser.Scene {
       g.fillStyle(colors.gold, 1)
         .fillCircle(viewport.huntedEyeLeft.x, viewport.huntedEyeLeft.y, viewport.huntedEyeLeft.radius)
         .fillCircle(viewport.huntedEyeRight.x, viewport.huntedEyeRight.y, viewport.huntedEyeRight.radius);
-      const preview = encounterPreview(current.tile, front.tile);
+      const preview = encounterPreview(current.tile, front.tile, this.state);
       this.label(preview.name, viewport.huntedName.x, viewport.huntedName.y, text.gold);
       this.label(preview.intent, viewport.huntedIntent.x, viewport.huntedIntent.y, text.red);
     }
@@ -1019,11 +1019,15 @@ function runSpoilLine(state: SliceState): string {
   return `Carried by ${spoils.length} spoils`;
 }
 
-function encounterPreview(current: FloorTile | null, front: FloorTile | null): { name: string; intent: string } {
+function encounterPreview(current: FloorTile | null, front: FloorTile | null, state: SliceState): { name: string; intent: string } {
   const interactionId = current?.interaction?.type === 'combat' ? current.interaction.id : front?.interaction?.type === 'combat' ? front.interaction.id : null;
-  if (interactionId === 'underroot-boss-1') return { name: 'Underroot Alpha', intent: 'Intent: Bite 10' };
-  if (interactionId === 'underroot-elite-1') return { name: 'Root-Knotted Brute', intent: 'Intent: Bite 8' };
-  return { name: 'Rootbitten Wolf', intent: 'Intent: Bite 6' };
+  if (interactionId === 'underroot-boss-1') return { name: 'Underroot Alpha', intent: `Intent: Bite ${10 + pressureAttackBonus(state)}` };
+  if (interactionId === 'underroot-elite-1') return { name: 'Root-Knotted Brute', intent: `Intent: Bite ${8 + pressureAttackBonus(state)}` };
+  return { name: 'Rootbitten Wolf', intent: `Intent: Bite ${6 + pressureAttackBonus(state)}` };
+}
+
+function pressureAttackBonus(state: SliceState): number {
+  return state.floorId === 'underroot-m2-placeholder' && state.threatClock >= 8 ? 2 : 0;
 }
 
 function tileCue(prefix: 'Here' | 'Ahead', tile: FloorTile | null, state: SliceState): string {

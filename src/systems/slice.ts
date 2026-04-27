@@ -242,7 +242,7 @@ function resolveInteraction(state: SliceState, interaction: TileInteraction): Co
         combat,
         activeInteractionId: interaction.id,
         combatReturn: interaction.returnTo,
-        log: [...state.log, interaction.logLine, ...spoilCombatLog(state)],
+        log: [...state.log, interaction.logLine, ...pressureCombatLog(state), ...spoilCombatLog(state)],
       },
       events: [{ type: 'COMBAT_STARTED' }],
     };
@@ -292,7 +292,7 @@ function canOpenBoss(state: SliceState): boolean {
 
 function createCombatForState(state: SliceState, interactionId: string): CombatState {
   const combat = state.floorId === UNDERROOT_M2_FLOOR_ID ? tuneUnderrootEncounter(createCombatWithCards(state.seed, M1_STARTER_CARDS), interactionId) : createCombat(state.seed);
-  return applySpoils(combat, state);
+  return applyPressure(applySpoils(combat, state), state);
 }
 
 function applySpoils(combat: CombatState, state: SliceState): CombatState {
@@ -348,6 +348,29 @@ function tuneUnderrootEncounter(combat: CombatState, interactionId: string): Com
   }
 
   return combat;
+}
+
+function applyPressure(combat: CombatState, state: SliceState): CombatState {
+  const bonus = pressureAttackBonus(state);
+  if (bonus === 0 || combat.enemy.intent.type !== 'attack') return combat;
+  return {
+    ...combat,
+    enemy: {
+      ...combat.enemy,
+      intent: {
+        ...combat.enemy.intent,
+        amount: combat.enemy.intent.amount + bonus,
+      },
+    },
+  };
+}
+
+function pressureAttackBonus(state: SliceState): number {
+  return state.floorId === UNDERROOT_M2_FLOOR_ID && state.threatClock >= 8 ? 2 : 0;
+}
+
+function pressureCombatLog(state: SliceState): string[] {
+  return pressureAttackBonus(state) > 0 ? ['The roots are hunting. The next bite sharpens.'] : [];
 }
 
 function spoilCombatLog(state: SliceState): string[] {
