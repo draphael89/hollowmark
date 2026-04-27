@@ -189,6 +189,7 @@ describe('mode-safe slice reducer', () => {
     expect(shortcut.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-shortcut-1', interaction: 'shortcut' });
     expect(shortcut.state.position).toEqual({ x: 1, y: 3 });
     expect(shortcut.state.townDebt).toBe(2);
+    expect(shortcut.state.log.at(-1)).toBe('Roots take blood and fold you back to the main seam.');
   });
 
   it('turns claimed Underroot rewards into distinct combat starts', () => {
