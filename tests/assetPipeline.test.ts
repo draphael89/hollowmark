@@ -38,8 +38,8 @@ describe('asset production foundation', () => {
       expect(['in_game_previewed', 'approved', 'rejected']).toContain(asset.approvalState);
       expect(asset.title.length).toBeGreaterThan(0);
       expect(asset.reviewFocus.length).toBeGreaterThan(0);
-      expect(asset.rawSource).toMatch(new RegExp('^\\.curation/raw/underroot/batch-01/.+\\.png$'));
-      expect(asset.processedPath).toMatch(new RegExp('^public/assets/drafts/underroot/batch-01/.+\\.png$'));
+      expect(asset.rawSource).toMatch(new RegExp('^\\.curation/raw/underroot/batch-\\d+/.+\\.png$'));
+      expect(asset.processedPath).toMatch(new RegExp('^public/assets/drafts/underroot/batch-\\d+/.+\\.png$'));
       expect(existsSync(asset.rawSource!)).toBe(true);
       expect(existsSync(asset.processedPath!)).toBe(true);
       expect(asset.finalSize.w).toBeGreaterThan(0);
@@ -72,15 +72,15 @@ describe('asset production foundation', () => {
     expect(approved.find((asset) => asset.id === 'card.blood-edge.placeholder')?.humanEditNotes).toContain('tiny-crop review');
   });
 
-  it('tracks the wolf matte preview separately from the raw draft', () => {
+  it('tracks the active wolf preview separately from rejected cleanup attempts', () => {
     const manifest = readAssetManifest();
     const wolf = manifest.assets.find((asset) => asset.id === 'enemy.root-wolf.placeholder');
 
     expect(wolf?.approvalState).toBe('in_game_previewed');
-    expect(wolf?.processedPath).toBe('public/assets/drafts/underroot/batch-01/rootbitten-wolf-clean-preview-01.png');
-    expect(wolf?.matteOrMaskNotes).toContain('threshold 24');
-    expect(wolf?.matteOrMaskNotes).toContain('enclosed transparent holes are restored');
-    expect(wolf?.humanEditNotes).toContain('still not approved');
+    expect(wolf?.promptPath).toBe('.prompts/underroot/root-wolf-enemy-batch-02.txt');
+    expect(wolf?.processedPath).toBe('public/assets/drafts/underroot/batch-02/rootbitten-wolf-preview-01.png');
+    expect(wolf?.matteOrMaskNotes).toContain('tolerance 54');
+    expect(wolf?.humanEditNotes).toContain('six generated candidates');
   });
 });
 
