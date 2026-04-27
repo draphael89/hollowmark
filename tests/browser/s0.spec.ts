@@ -342,6 +342,8 @@ test('M2 browser smoke: Marrowgate enters Underroot and returns with tile progre
   await expectDebugState(page, (state) => {
     expect(state.completedInteractions).toContain('underroot-rest-1');
     expect(state.position).toEqual({ x: 1, y: 4 });
+    expect(state.threatClock).toBe(0);
+    expect(state.log.at(-1)).toBe('Sanctuary moss steadies the party. The roots go quiet.');
     expect(state.lastEvents).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-rest-1', interaction: 'rest' });
   });
 

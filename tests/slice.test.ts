@@ -165,7 +165,8 @@ describe('mode-safe slice reducer', () => {
     const rest = applyCommand(state, { type: 'interact' });
     expect(rest.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-rest-1', interaction: 'rest' });
     expect(rest.state.completedInteractions).toContain('underroot-rest-1');
-    expect(rest.state.log.at(-1)).toContain('Sanctuary moss');
+    expect(rest.state.threatClock).toBe(0);
+    expect(rest.state.log.at(-1)).toBe('Sanctuary moss steadies the party. The roots go quiet.');
 
     const repeated = applyCommand(rest.state, { type: 'interact' });
     expect(repeated.events).toEqual([{ type: 'INTERACT_NONE' }]);
@@ -288,6 +289,20 @@ describe('mode-safe slice reducer', () => {
     state = applyCommand({ ...state, facing: 'east' }, { type: 'step-forward' }).state;
     expect(state.position).toEqual({ x: 2, y: 3 });
     expect(state.threatClock).toBe(4);
+  });
+
+  it('lets the Underroot rest reset accumulated pressure once', () => {
+    let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
+    state = applyCommand({ ...state, threatClock: 5 }, { type: 'step-forward' }).state;
+
+    const rested = applyCommand(state, { type: 'interact' });
+    const repeated = applyCommand(rested.state, { type: 'interact' });
+
+    expect(state.threatClock).toBe(6);
+    expect(rested.state.threatClock).toBe(0);
+    expect(rested.state.completedInteractions).toContain('underroot-rest-1');
+    expect(repeated.state.threatClock).toBe(0);
+    expect(repeated.events).toEqual([{ type: 'INTERACT_NONE' }]);
   });
 
   it('settles placeholder debt in Marrowgate Sanctuary', () => {

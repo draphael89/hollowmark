@@ -35,7 +35,7 @@ export const UNDERROOT_M2_FLOOR: FloorDef = {
       interaction: {
         type: 'rest',
         id: 'underroot-rest-1',
-        logLine: 'Sanctuary moss steadies the party for the deeper hall.',
+        logLine: 'Sanctuary moss steadies the party. The roots go quiet.',
       },
     },
     {
