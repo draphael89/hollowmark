@@ -23,6 +23,11 @@ declare global {
       selectedStatusRule: string | null;
       intentText: string | null;
       gameplayAssets: {
+        explorationBackground: null | {
+          id: string;
+          path: string;
+          approvalGate: string;
+        };
         combatBackground: null | {
           id: string;
           path: string;
@@ -61,6 +66,11 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
   expect(combatStarted.feelSettings.reducedMotion).toBe(false);
   expect(combatStarted.intentText).toBe('Bite Liese for 6');
   expect(combatStarted.gameplayAssets).toEqual({
+    explorationBackground: {
+      id: 'underroot.corridor.placeholder',
+      path: '/assets/drafts/underroot/batch-01/underroot-corridor-preview-01.png',
+      approvalGate: 'approved-for-gameplay',
+    },
     combatBackground: {
       id: 'underroot.combat.placeholder',
       path: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
@@ -706,6 +716,11 @@ async function expectDebugState(
 type DebugState = {
   intentText: string | null;
   gameplayAssets: {
+    explorationBackground: null | {
+      id: string;
+      path: string;
+      approvalGate: string;
+    };
     combatBackground: null | {
       id: string;
       path: string;
