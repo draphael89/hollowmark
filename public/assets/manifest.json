@@ -82,11 +82,11 @@
         "h": 48
       },
       "palette": "draft-generated",
-      "cropNotes": "Center-cropped and downsampled to 64x48. Blade reads at tiny size; abstract wall marks must be checked for accidental text.",
+      "cropNotes": "Center-cropped and downsampled to 64x48. Blade reads at tiny size; abstract wall marks are non-textural scratches, not readable glyphs.",
       "matteOrMaskNotes": "Not applicable for card crop.",
-      "humanEditNotes": "Batch 01 draft previewed in Visual Gallery. Tiny crop reads; do not approve until accidental wall-glyph review is complete.",
+      "humanEditNotes": "Approved after Visual Gallery tiny-crop review. Eligible for future card-art wiring through the manifest; do not reference the raw file path from gameplay data.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "in_game_previewed",
+      "approvalState": "approved",
       "rejectionNotes": null
     },
     {

@@ -61,9 +61,10 @@ describe('asset production foundation', () => {
     const manifest = readAssetManifest();
     const approved = manifest.assets.filter((asset) => asset.approvalState === 'approved');
 
-    expect(approved.map((asset) => asset.id)).toEqual(['underroot.combat.placeholder']);
-    expect(approved[0]?.humanEditNotes).toContain('Combat Sandbox composition review');
-    expect(approved[0]?.inGamePreview).toBe('?scene=combat-sandbox');
+    expect(approved.map((asset) => asset.id)).toEqual(['underroot.combat.placeholder', 'card.blood-edge.placeholder']);
+    expect(approved.find((asset) => asset.id === 'underroot.combat.placeholder')?.humanEditNotes).toContain('Combat Sandbox composition review');
+    expect(approved.find((asset) => asset.id === 'underroot.combat.placeholder')?.inGamePreview).toBe('?scene=combat-sandbox');
+    expect(approved.find((asset) => asset.id === 'card.blood-edge.placeholder')?.humanEditNotes).toContain('tiny-crop review');
   });
 
   it('tracks the wolf matte preview separately from the raw draft', () => {

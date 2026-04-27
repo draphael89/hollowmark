@@ -234,7 +234,7 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
     selectedApprovalGate: 'needs-review',
     selectedReviewFocus: 'depth, tile read, no text',
   }));
-  expect(debug.visualGallery?.gameplayReadyAssetIds).toEqual(['underroot.combat.placeholder']);
+  expect(debug.visualGallery?.gameplayReadyAssetIds).toEqual(['underroot.combat.placeholder', 'card.blood-edge.placeholder']);
   expect(debug.visualGallery?.stableIds).toEqual([
     'underroot.corridor.placeholder',
     'underroot.combat.placeholder',
@@ -249,7 +249,8 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
   expect(debug.visualGallery).toEqual(expect.objectContaining({
     selectedId: 'card.blood-edge.placeholder',
     selectedKind: 'card-art',
-    selectedApprovalGate: 'needs-review',
+    selectedStatus: 'approved',
+    selectedApprovalGate: 'approved-for-gameplay',
     selectedReviewFocus: 'temptation, danger, crop safety',
   }));
 
