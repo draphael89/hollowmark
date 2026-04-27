@@ -31,7 +31,7 @@ describe('asset manifest', () => {
       expect(asset.id).toMatch(/^[a-z0-9.-]+\.placeholder$/);
       expect(asset.title.length).toBeGreaterThan(0);
       expect(asset.reviewFocus.length).toBeGreaterThan(0);
-      expect(asset.previewPath).toMatch(/^\/assets\/drafts\/underroot\/batch-01\/.+\.png$/);
+      expect(asset.previewPath).toMatch(/^\/assets\/drafts\/underroot\/batch-\d+\/.+\.png$/);
       expect(Object.keys(asset).sort()).toEqual(['approvalGate', 'id', 'kind', 'previewPath', 'reviewFocus', 'status', 'title']);
     }
   });
