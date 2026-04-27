@@ -14,11 +14,11 @@ Processed preview files live under `public/assets/drafts/underroot/batch-01/` so
 The generated contact sheet is `.curation/contact_sheets/underroot-batch-01.svg`.
 
 Selection notes:
-- Corridor: strong depth and torch read. Needs human review for possible pseudo-glyphs on side stones before approval.
-- Combat background: best immediate candidate; clear enemy stage and floor contact.
-- Rootbitten Wolf: strong silhouette. Needs matte/alpha extraction before any gameplay use.
-- Blood Edge: strong tiny crop. Needs accidental-text review because the wall marks flirt with glyph shapes.
-- UI ornaments: strong sheet, but generated as landscape. The square preview crop is not enough for approval; use the raw source for deliberate slicing or rerun with stricter square-sheet composition.
+- Corridor: `in_game_previewed`. Strong depth and torch read. Needs human review for possible pseudo-glyphs on side stones before approval.
+- Combat background: `in_game_previewed`. Best immediate candidate; clear enemy stage and floor contact. Ready for final no-text approval review.
+- Rootbitten Wolf: `in_game_previewed`. Strong silhouette. Near-black matte was removed into `rootbitten-wolf-matte-preview-01.png`; edge cleanup still needs review before approval.
+- Blood Edge: `in_game_previewed`. Strong tiny crop. Needs accidental-text review because the wall marks flirt with glyph shapes.
+- UI ornaments: `rejected`. Strong motifs, but generated as a landscape sheet; the square preview crop drops too much useful material. Rerun with stricter square-sheet composition or slice deliberately from the raw source.
 
 Gate:
 - No generated bitmap is referenced by gameplay data. Draft previews are served only for Visual Gallery review.

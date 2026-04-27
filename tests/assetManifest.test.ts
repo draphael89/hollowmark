@@ -18,8 +18,16 @@ describe('asset manifest', () => {
   });
 
   it('derives gallery entries from public passports', () => {
+    const expectedStates = new Map([
+      ['underroot.corridor.placeholder', 'in_game_previewed'],
+      ['underroot.combat.placeholder', 'in_game_previewed'],
+      ['enemy.root-wolf.placeholder', 'in_game_previewed'],
+      ['card.blood-edge.placeholder', 'in_game_previewed'],
+      ['ui.ornaments.placeholder', 'rejected'],
+    ]);
+
     for (const asset of readGalleryAssets()) {
-      expect(asset.status).toBe('processed');
+      expect(asset.status).toBe(expectedStates.get(asset.id));
       expect(asset.id).toMatch(/^[a-z0-9.-]+\.placeholder$/);
       expect(asset.title.length).toBeGreaterThan(0);
       expect(asset.reviewFocus.length).toBeGreaterThan(0);

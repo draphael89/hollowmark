@@ -2,7 +2,7 @@ export const ASSET_MANIFEST_KEY = 'asset-manifest';
 export const ASSET_MANIFEST_URL = '/assets/manifest.json';
 
 export type AssetKind = 'background' | 'sprite' | 'card-art' | 'ui';
-export type AssetStatus = 'placeholder' | 'raw_generated' | 'candidate' | 'processed' | 'in_game_previewed' | 'approved' | 'manifested';
+export type AssetStatus = 'placeholder' | 'raw_generated' | 'candidate' | 'processed' | 'in_game_previewed' | 'approved' | 'rejected' | 'manifested';
 
 export type AssetManifestEntry = Readonly<{
   id: string;
