@@ -1,4 +1,4 @@
-import type { CardInstanceId, CombatCommand, ExploreCommand, GameEvent, SliceCommand, SliceState, TileInteraction, TownCommand } from '../game/types';
+import type { CardInstanceId, CombatCommand, CombatState, ExploreCommand, GameEvent, SliceCommand, SliceState, TileInteraction, TownCommand } from '../game/types';
 import { M1_STARTER_CARDS } from '../data/combat';
 import { createCombat, createCombatWithCards, endTurn, holdCard, playCard } from './combat';
 import { floorForId, START_FLOOR_ID, UNDERROOT_M2_FLOOR_ID } from '../data/floors';
@@ -224,7 +224,7 @@ function interact(state: SliceState): CommandResult {
 
 function resolveInteraction(state: SliceState, interaction: TileInteraction): CommandResult {
   if (interaction.type === 'combat') {
-    const combat = createCombatForState(state);
+    const combat = createCombatForState(state, interaction.id);
     return {
       state: {
         ...state,
@@ -273,8 +273,8 @@ function resolveInteraction(state: SliceState, interaction: TileInteraction): Co
   return assertNever(interaction);
 }
 
-function createCombatForState(state: SliceState) {
-  const combat = state.floorId === UNDERROOT_M2_FLOOR_ID ? createCombatWithCards(state.seed, M1_STARTER_CARDS) : createCombat(state.seed);
+function createCombatForState(state: SliceState, interactionId: string): CombatState {
+  const combat = state.floorId === UNDERROOT_M2_FLOOR_ID ? tuneUnderrootEncounter(createCombatWithCards(state.seed, M1_STARTER_CARDS), interactionId) : createCombat(state.seed);
   const spoilCount = countCompleted(state, 'underroot-reward-');
   if (spoilCount === 0) return combat;
 
@@ -285,6 +285,38 @@ function createCombatForState(state: SliceState) {
       block: hero.block + spoilCount,
     })),
   };
+}
+
+function tuneUnderrootEncounter(combat: CombatState, interactionId: string): CombatState {
+  if (interactionId === 'underroot-elite-1') {
+    return {
+      ...combat,
+      enemy: {
+        ...combat.enemy,
+        id: 'root-knotted-brute',
+        name: 'Root-Knotted Brute',
+        hp: 32,
+        maxHp: 32,
+        intent: { type: 'attack', target: 'mia', amount: 8 },
+      },
+    };
+  }
+
+  if (interactionId === 'underroot-boss-1') {
+    return {
+      ...combat,
+      enemy: {
+        ...combat.enemy,
+        id: 'underroot-alpha',
+        name: 'Underroot Alpha',
+        hp: 42,
+        maxHp: 42,
+        intent: { type: 'attack', target: 'liese', amount: 10 },
+      },
+    };
+  }
+
+  return combat;
 }
 
 function spoilCombatLog(state: SliceState): string[] {
