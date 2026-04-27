@@ -1,0 +1,8 @@
+Create textless card art for a dark first-person dungeon-crawler deckbuilder.
+Card concept: Rootfire - Mia seeds poison through a living root flame and accepts a small debt for the corruption.
+Visual metaphor: a crooked root candle burning with sick green-black embers, poison smoke curling into a wolf-shaped bite mark.
+Class: Mage; use subtle cracked glass, ember, thorn-root, and debt-mark motifs.
+Composition: tight crop, strong silhouette, readable at tiny size, no UI frame, no text, no words, no numbers.
+Style: moonlit oxblood dungeon manuscript; painterly pixel-art source for a 16-bit-inspired first-person dungeon RPG; high-contrast silhouettes; deep indigo shadows; bone-colored highlights; muted torch accents.
+Use: will be cropped to 64x48 inside a card frame.
+Avoid: readable lettering, modern symbols, bright saturated colors, detailed full battle scenes, anime style, clean fantasy fireball, neon green glow.
