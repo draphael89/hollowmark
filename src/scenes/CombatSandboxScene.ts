@@ -21,7 +21,7 @@ const COMBAT_PREVIEW = {
   backgroundKey: 'underroot-combat-preview',
   enemyId: 'enemy.root-wolf.placeholder',
   enemyKey: 'rootbitten-wolf-matte-preview',
-  compositionGate: 'needs-review',
+  compositionGate: 'approved-for-gameplay',
 } as const;
 const HAND_SLOT_HITBOXES = [
   { x: 78, y: 114, w: 58, h: 18 },

@@ -57,30 +57,32 @@ describe('asset production foundation', () => {
     expect(rejected[0]?.rejectionNotes).toContain('Rejected for approval');
   });
 
-  it('approves the reviewed first-batch assets without advancing review candidates', () => {
+  it('approves reviewed assets without advancing rejected candidates', () => {
     const manifest = readAssetManifest();
     const approved = manifest.assets.filter((asset) => asset.approvalState === 'approved');
 
     expect(approved.map((asset) => asset.id)).toEqual([
       'underroot.corridor.placeholder',
       'underroot.combat.placeholder',
+      'enemy.root-wolf.placeholder',
       'card.blood-edge.placeholder',
     ]);
     expect(approved.find((asset) => asset.id === 'underroot.corridor.placeholder')?.humanEditNotes).toContain('no generated text');
     expect(approved.find((asset) => asset.id === 'underroot.combat.placeholder')?.humanEditNotes).toContain('Combat Sandbox composition review');
     expect(approved.find((asset) => asset.id === 'underroot.combat.placeholder')?.inGamePreview).toBe('?scene=combat-sandbox');
+    expect(approved.find((asset) => asset.id === 'enemy.root-wolf.placeholder')?.humanEditNotes).toContain('checkerboard alpha review');
     expect(approved.find((asset) => asset.id === 'card.blood-edge.placeholder')?.humanEditNotes).toContain('tiny-crop review');
   });
 
-  it('tracks the active wolf preview separately from rejected cleanup attempts', () => {
+  it('tracks the approved wolf preview separately from rejected cleanup attempts', () => {
     const manifest = readAssetManifest();
     const wolf = manifest.assets.find((asset) => asset.id === 'enemy.root-wolf.placeholder');
 
-    expect(wolf?.approvalState).toBe('in_game_previewed');
+    expect(wolf?.approvalState).toBe('approved');
     expect(wolf?.promptPath).toBe('.prompts/underroot/root-wolf-enemy-batch-02.txt');
     expect(wolf?.processedPath).toBe('public/assets/drafts/underroot/batch-02/rootbitten-wolf-preview-01.png');
     expect(wolf?.matteOrMaskNotes).toContain('tolerance 54');
-    expect(wolf?.humanEditNotes).toContain('six generated candidates');
+    expect(wolf?.inGamePreview).toBe('?scene=combat-sandbox');
   });
 });
 
