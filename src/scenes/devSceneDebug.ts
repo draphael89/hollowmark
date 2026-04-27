@@ -18,6 +18,13 @@ export type CombatSandboxDebug = {
   heroStatuses: Readonly<Record<string, StatusStacks>>;
   statusLegend: readonly string[];
   lastEvents: readonly string[];
+  assetPreview: {
+    backgroundId: string;
+    backgroundPath: string;
+    enemyId: string;
+    enemyPath: string;
+    approvalState: string;
+  };
   selectedCard: null | {
     slot: string;
     id: CardId;

@@ -15,6 +15,15 @@ const text = THEME.text;
 const textStyle = THEME.textStyle;
 const SANDBOX_EVENT_STAGGER_MS = 120;
 const SANDBOX_ENEMY_X = 304;
+const COMBAT_PREVIEW = {
+  backgroundId: 'underroot.combat.placeholder',
+  backgroundKey: 'underroot-combat-preview',
+  backgroundPath: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
+  enemyId: 'enemy.root-wolf.placeholder',
+  enemyKey: 'rootbitten-wolf-matte-preview',
+  enemyPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png',
+  approvalState: 'in_game_previewed',
+} as const;
 const HAND_SLOT_HITBOXES = [
   { x: 78, y: 114, w: 58, h: 18 },
   { x: 140, y: 114, w: 58, h: 18 },
@@ -55,6 +64,11 @@ export class CombatSandboxScene extends Phaser.Scene {
 
   constructor() {
     super('CombatSandboxScene');
+  }
+
+  preload(): void {
+    this.load.image(COMBAT_PREVIEW.backgroundKey, COMBAT_PREVIEW.backgroundPath);
+    this.load.image(COMBAT_PREVIEW.enemyKey, COMBAT_PREVIEW.enemyPath);
   }
 
   create(): void {
@@ -184,11 +198,21 @@ export class CombatSandboxScene extends Phaser.Scene {
     g.fillStyle(colors.panel, 1).fillRect(16, 16, 608, 328);
     g.lineStyle(2, colors.oxblood, 1).strokeRect(16, 16, 608, 328);
     g.fillStyle(colors.combatVoid, 1).fillRect(38, 50, 360, 190);
-    g.fillStyle(colors.oxblood, 1).fillTriangle(SANDBOX_ENEMY_X - 50, 180, SANDBOX_ENEMY_X, 90, SANDBOX_ENEMY_X + 50, 180);
-    g.fillStyle(colors.gold, 1).fillCircle(SANDBOX_ENEMY_X - 14, 132, 4).fillCircle(SANDBOX_ENEMY_X + 14, 132, 4);
     g.fillStyle(colors.panelDeep, 1).fillRect(424, 50, 174, 190);
 
+    this.add.image(218, 124, COMBAT_PREVIEW.backgroundKey)
+      .setDisplaySize(360, 146);
+    const plate = this.add.graphics();
+    plate.fillStyle(colors.void, 0.18).fillRect(38, 51, 360, 146);
+    plate.fillStyle(colors.void, 0.45).fillEllipse(SANDBOX_ENEMY_X, 171, 94, 16);
+    this.add.image(SANDBOX_ENEMY_X, 130, COMBAT_PREVIEW.enemyKey)
+      .setDisplaySize(84, 112);
+    plate.lineStyle(1, colors.oxblood, 0.85).strokeRect(38, 51, 360, 146);
+    plate.fillStyle(colors.panelDeep, 0.96).fillRect(38, 204, 360, 102);
+    plate.lineStyle(1, colors.stoneLight, 0.45).strokeRect(38, 204, 360, 102);
+
     this.label('Combat Sandbox', 32, 28, text.gold);
+    this.label('Draft combat comp', 44, 184, text.mutedBone);
     cues.forEach((cue, index) => this.label(cue.label, 440, 66 + index * 22, text.bone));
     this.label('7 M1 deck', 440, 66 + cues.length * 22, text.cyan);
     this.label('8 Play first', 440, 66 + (cues.length + 1) * 22, text.cyan);
@@ -196,8 +220,8 @@ export class CombatSandboxScene extends Phaser.Scene {
     this.label('Q-T select  Enter play', 440, 66 + (cues.length + 3) * 22, text.cyan);
     this.label('H Hold first', 440, 66 + (cues.length + 4) * 22, text.cyan);
     this.label('0 Status stack', 440, 66 + (cues.length + 5) * 22, text.cyan);
-    this.deckLabel = this.add.text(44, 64, deckPreviewText(m1DeckPreview(this.labCombat), this.labCombat, this.selectedSlot), { ...textStyle, color: text.bone, lineSpacing: 4 });
-    this.statusLabel = this.add.text(32, 260, `Last: ${this.lastCue}`, { ...textStyle, color: text.cyan });
+    this.deckLabel = this.add.text(44, 210, deckPreviewText(m1DeckPreview(this.labCombat), this.labCombat, this.selectedSlot), { ...textStyle, color: text.bone, fontSize: '8px', lineSpacing: 0 });
+    this.statusLabel = this.add.text(32, 316, `Last: ${this.lastCue}`, { ...textStyle, color: text.cyan });
     HAND_SLOT_HITBOXES.forEach((box, index) => {
       this.add.zone(box.x, box.y, box.w, box.h)
         .setOrigin(0)
@@ -228,6 +252,13 @@ export class CombatSandboxScene extends Phaser.Scene {
         statusLegend: statusLegend(),
         lastEvents: this.lastEvents,
         selectedCard: selectedCardDebug(this.labCombat, this.selectedSlot),
+        assetPreview: {
+          backgroundId: COMBAT_PREVIEW.backgroundId,
+          backgroundPath: COMBAT_PREVIEW.backgroundPath,
+          enemyId: COMBAT_PREVIEW.enemyId,
+          enemyPath: COMBAT_PREVIEW.enemyPath,
+          approvalState: COMBAT_PREVIEW.approvalState,
+        },
       },
     });
   }
@@ -360,7 +391,6 @@ function deckPreviewText(preview: DeckPreview, combat: CombatState, selectedSlot
     `Wolf ${combat.enemy.hp}/${combat.enemy.maxHp} ${statusSummary(combat.enemy.statuses) || '-'}`,
     `Debt ${combat.heroes.map((hero) => `${hero.name[0]}${hero.debt}`).join(' ')}`,
     selectedHandDetail(combat, selectedSlot),
-    `Status ${compactStatusLegend()}`,
   ].join('\n');
 }
 
@@ -435,10 +465,6 @@ function selectedCardDebug(combat: CombatState, selectedSlot: number) {
     target: card.target.type,
     text: card.text,
   };
-}
-
-function compactStatusLegend(): string {
-  return statusLegend().map((entry) => entry.split(':')[0]).join(' / ');
 }
 
 function assertNever(value: never): never {
