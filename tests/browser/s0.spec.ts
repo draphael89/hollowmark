@@ -242,7 +242,7 @@ test('M1 browser smoke: seeded starter route plays a natural 24-card win', async
   });
   expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
 
-  await page.goto('/');
+  await page.goto('/?scene=s0');
   await expectDebugState(page, (state) => {
     expect(state.mode).toBe('explore');
     expect(state.seed).toBe('s0-root-wolf');
@@ -280,6 +280,27 @@ test('M1 browser smoke: natural route survives an enemy turn and refills', async
   });
   expect(await page.evaluate(() => window.localStorage.getItem('hollowmark:s0-save'))).toBeNull();
   expect(pageErrors).toEqual([]);
+});
+
+test('default route opens the playable Underroot dive from Marrowgate', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('town');
+    expect(state.floorId).toBe('underroot-m2-placeholder');
+    expect(state.townService).toBe('gate');
+    expect(state.completedInteractions).toEqual([]);
+  });
+
+  await page.keyboard.press('Space');
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.position).toEqual({ x: 1, y: 5 });
+    expect(state.lastEvents).toContainEqual({ type: 'UNDERROOT_ENTERED' });
+  });
 });
 
 test('M2 browser smoke: Marrowgate enters Underroot and returns with tile progress', async ({ page }) => {
@@ -346,7 +367,7 @@ test('M2 browser smoke: exploration keeps one buffered movement input', async ({
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
 
-  await page.keyboard.press('KeyG');
+  await page.keyboard.press('Space');
   await expect.poll(async () => (await getDebugState(page)).mode).toBe('explore');
 
   await page.keyboard.press('KeyW');
@@ -657,7 +678,7 @@ async function clickGame(page: Page, canvas: Locator, x: number, y: number) {
 
 async function startFresh(page: Page) {
   await page.addInitScript(() => window.localStorage.clear());
-  await page.goto('/');
+  await page.goto('/?scene=s0');
 }
 
 async function enterS0Combat(page: Page) {
@@ -695,7 +716,7 @@ async function playCardByDefDebug(page: Page, defId: CardId) {
 }
 
 async function startFreshForRestore(page: Page) {
-  await page.goto('/');
+  await page.goto('/?scene=s0');
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
 }
