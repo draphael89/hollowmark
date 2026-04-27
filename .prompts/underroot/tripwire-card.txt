@@ -1,0 +1,8 @@
+Create textless card art for a dark first-person dungeon-crawler deckbuilder.
+Card concept: Tripwire - Robin snares the enemy, making it Weak and opening a small Bleed wound.
+Visual metaphor: taut black cord across root-stone floor, a hooked thorn catching a wolf paw with one restrained oxblood spark.
+Class: Ranger; use subtle bowstring, trap wire, thorn, knot, and trail-sign motifs.
+Composition: tight crop, strong silhouette, readable at tiny size, no UI frame, no text, no words, no numbers.
+Style: moonlit oxblood dungeon manuscript; painterly pixel-art source for a 16-bit-inspired first-person dungeon RPG; high-contrast silhouettes; deep indigo shadows; bone-colored highlights; muted torch accents.
+Use: will be cropped to 64x48 inside a card frame.
+Avoid: readable lettering, modern symbols, bright saturated colors, detailed full battle scenes, anime style, bear trap gore, modern wire or metal cable.

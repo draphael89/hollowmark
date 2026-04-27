@@ -1,0 +1,8 @@
+Create textless card art for a dark first-person dungeon-crawler deckbuilder.
+Card concept: Oath Ward - Liese braces under an old vow, gaining block and one Ward that prevents a coming hit.
+Visual metaphor: a battered tower shield and raised oath hand catching a pale bone-gold impact spark before it reaches the hero.
+Class: Warrior; use subtle iron, shield, oath-knot, and worn tabard motifs.
+Composition: tight crop, strong silhouette, readable at tiny size, no UI frame, no text, no words, no numbers.
+Style: moonlit oxblood dungeon manuscript; painterly pixel-art source for a 16-bit-inspired first-person dungeon RPG; high-contrast silhouettes; deep indigo shadows; bone-colored highlights; muted torch accents.
+Use: will be cropped to 64x48 inside a card frame.
+Avoid: readable lettering, modern symbols, bright saturated colors, detailed full battle scenes, anime style, angel wings, holy beams, clean high-fantasy armor.
