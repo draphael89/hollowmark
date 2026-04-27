@@ -438,6 +438,44 @@ test('M2 browser smoke: shortcut branch folds back to the main seam with debt', 
   expect(pageErrors).toEqual([]);
 });
 
+test('M2 browser smoke: unsettled town debt wakes pressure on the next dive', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m2-underroot');
+  await expect(page.locator('canvas')).toBeVisible();
+
+  await dispatchDebug(page, { type: 'enter-underroot' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'turn-right' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'interact' });
+  await dispatchDebug(page, { type: 'turn-left' });
+  await dispatchDebug(page, { type: 'turn-left' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'turn-right' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'interact' });
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('town');
+    expect(state.townDebt).toBe(1);
+    expect(state.completedInteractions).toEqual(['underroot-reward-1', 'underroot-return-1']);
+  });
+
+  await dispatchDebug(page, { type: 'enter-underroot' });
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.threatClock).toBe(4);
+    expect(state.log.slice(-2)).toEqual([
+      'The gate opens. Wet stone swallows the torchlight.',
+      'Old debt wakes under the stair.',
+    ]);
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test('M2 browser smoke: hunting pressure sharpens the next bite', async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));

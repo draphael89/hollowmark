@@ -312,6 +312,35 @@ describe('mode-safe slice reducer', () => {
     expect(state.threatClock).toBe(4);
   });
 
+  it('carries unsettled Marrowgate debt into the next Underroot entry pressure', () => {
+    const indebted = applyCommand(
+      {
+        ...createTownState('m2-underroot'),
+        townDebt: 3,
+      },
+      { type: 'enter-underroot' },
+    );
+    const settled = applyCommand(
+      applyCommand(
+        {
+          ...createTownState('m2-underroot'),
+          townDebt: 3,
+        },
+        { type: 'settle-debt' },
+      ).state,
+      { type: 'enter-underroot' },
+    );
+
+    expect(indebted.state.mode).toBe('explore');
+    expect(indebted.state.threatClock).toBe(12);
+    expect(indebted.state.log.slice(-2)).toEqual([
+      'The gate opens. Wet stone swallows the torchlight.',
+      'Old debt wakes under the stair.',
+    ]);
+    expect(settled.state.threatClock).toBe(0);
+    expect(settled.state.log.at(-1)).toBe('The gate opens. Wet stone swallows the torchlight.');
+  });
+
   it('lets the Underroot rest reset accumulated pressure once', () => {
     let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
     state = applyCommand({ ...state, threatClock: 5 }, { type: 'step-forward' }).state;

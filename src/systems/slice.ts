@@ -85,6 +85,7 @@ function applyTownCommand(state: SliceState, command: TownCommand): CommandResul
 
   if (command.type === 'enter-underroot') {
     const floor = floorForId(UNDERROOT_M2_FLOOR_ID);
+    const debtPressure = entryDebtPressure(state.townDebt);
     return {
       state: {
         ...state,
@@ -94,8 +95,8 @@ function applyTownCommand(state: SliceState, command: TownCommand): CommandResul
         position: floor.start,
         facing: floor.startFacing,
         threat: threatAt(floor, floor.start),
-        threatClock: 0,
-        log: [...state.log, 'The gate opens. Wet stone swallows the torchlight.'],
+        threatClock: debtPressure,
+        log: [...state.log, 'The gate opens. Wet stone swallows the torchlight.', ...entryDebtLog(debtPressure)],
       },
       events: [{ type: 'UNDERROOT_ENTERED' }],
     };
@@ -142,6 +143,14 @@ function townServiceLog(service: SliceState['townService']): string {
   if (service === 'gate') return 'The Gate waits with its black stair.';
   if (service === 'vellum') return 'The Vellum lays the starter deck in a careful grid.';
   return 'The Sanctuary counts wounds and debt.';
+}
+
+function entryDebtPressure(townDebt: number): number {
+  return townDebt * 4;
+}
+
+function entryDebtLog(debtPressure: number): string[] {
+  return debtPressure > 0 ? ['Old debt wakes under the stair.'] : [];
 }
 
 function applyExploreCommand(state: SliceState, command: ExploreCommand): CommandResult {
