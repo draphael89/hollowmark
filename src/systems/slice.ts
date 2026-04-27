@@ -289,15 +289,29 @@ function canOpenBoss(state: SliceState): boolean {
 
 function createCombatForState(state: SliceState, interactionId: string): CombatState {
   const combat = state.floorId === UNDERROOT_M2_FLOOR_ID ? tuneUnderrootEncounter(createCombatWithCards(state.seed, M1_STARTER_CARDS), interactionId) : createCombat(state.seed);
-  const spoilCount = countCompleted(state, 'underroot-reward-');
-  if (spoilCount === 0) return combat;
+  return applySpoils(combat, state);
+}
+
+function applySpoils(combat: CombatState, state: SliceState): CombatState {
+  if (countCompleted(state, 'underroot-reward-') === 0) return combat;
 
   return {
     ...combat,
     heroes: combat.heroes.map((hero) => ({
       ...hero,
-      block: hero.block + spoilCount,
+      block: hero.block + (state.completedInteractions.includes('underroot-reward-1') ? 1 : 0),
+      statuses: {
+        ...hero.statuses,
+        ward: hero.statuses.ward + (state.completedInteractions.includes('underroot-reward-2') ? 1 : 0),
+      },
     })),
+    enemy: {
+      ...combat.enemy,
+      statuses: {
+        ...combat.enemy.statuses,
+        mark: combat.enemy.statuses.mark + (state.completedInteractions.includes('underroot-reward-3') ? 1 : 0),
+      },
+    },
   };
 }
 
@@ -334,10 +348,11 @@ function tuneUnderrootEncounter(combat: CombatState, interactionId: string): Com
 }
 
 function spoilCombatLog(state: SliceState): string[] {
-  const spoilCount = countCompleted(state, 'underroot-reward-');
-  if (spoilCount === 0) return [];
-  if (spoilCount === 1) return ['An Underroot spoil hardens the party: +1 block.'];
-  return [`Underroot spoils harden the party: +${spoilCount} block.`];
+  const lines: string[] = [];
+  if (state.completedInteractions.includes('underroot-reward-1')) lines.push('Warm Shard lights the party: +1 block.');
+  if (state.completedInteractions.includes('underroot-reward-2')) lines.push('Bone Charm wakes: the party gains Ward 1.');
+  if (state.completedInteractions.includes('underroot-reward-3')) lines.push('Silver Nest glitters: the enemy starts Marked.');
+  return lines;
 }
 
 function countCompleted(state: SliceState, prefix: string): number {

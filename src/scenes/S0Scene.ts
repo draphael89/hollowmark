@@ -1022,7 +1022,7 @@ function encounterPreview(current: FloorTile | null, front: FloorTile | null): {
 function tileCue(prefix: 'Here' | 'Ahead', tile: FloorTile | null, state: SliceState): string {
   const purpose = tile?.purpose ?? 'side-path';
   if (tile?.interaction?.type === 'reward') {
-    const claimed = state.completedInteractions.includes(tile.interaction.id) ? 'claimed' : `claim ${tile.interaction.spoil} +D${tile.interaction.debt}`;
+    const claimed = state.completedInteractions.includes(tile.interaction.id) ? 'claimed' : rewardCue(tile.interaction.id, tile.interaction.spoil, tile.interaction.debt);
     return `${purposeIcon(purpose)} ${prefix}: ${claimed}`;
   }
   if (tile?.interaction?.type === 'rest') {
@@ -1039,6 +1039,13 @@ function tileCue(prefix: 'Here' | 'Ahead', tile: FloorTile | null, state: SliceS
     return `${purposeIcon(purpose)} ${prefix}: fight`;
   }
   return `${purposeIcon(purpose)} ${prefix}: ${purposeLabel(purpose)}`;
+}
+
+function rewardCue(id: string, spoil: string, debt: number): string {
+  if (id === 'underroot-reward-1') return `${spoil} Blk +D${debt}`;
+  if (id === 'underroot-reward-2') return `${spoil} Wd +D${debt}`;
+  if (id === 'underroot-reward-3') return `${spoil} Mk +D${debt}`;
+  return `claim ${spoil} +D${debt}`;
 }
 
 function canOpenBossCue(state: SliceState): boolean {

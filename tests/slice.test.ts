@@ -190,21 +190,27 @@ describe('mode-safe slice reducer', () => {
     expect(shortcut.state.townDebt).toBe(2);
   });
 
-  it('turns claimed Underroot rewards into starting combat block', () => {
+  it('turns claimed Underroot rewards into distinct combat starts', () => {
     const state = {
       ...createTownState('m2-underroot'),
       mode: 'explore' as const,
       position: { x: 0, y: 3 },
       threat: 'hunted' as const,
-      completedInteractions: ['underroot-reward-1', 'underroot-reward-2'],
-      townDebt: 2,
+      completedInteractions: ['underroot-reward-1', 'underroot-reward-2', 'underroot-reward-3'],
+      townDebt: 3,
     };
 
     const result = applyCommand(state, { type: 'interact' });
 
     expect(result.state.mode).toBe('combat');
-    expect(result.state.combat?.heroes.every((hero) => hero.block === 2)).toBe(true);
-    expect(result.state.log.at(-1)).toBe('Underroot spoils harden the party: +2 block.');
+    expect(result.state.combat?.heroes.every((hero) => hero.block === 1)).toBe(true);
+    expect(result.state.combat?.heroes.every((hero) => hero.statuses.ward === 1)).toBe(true);
+    expect(result.state.combat?.enemy.statuses.mark).toBe(1);
+    expect(result.state.log.slice(-3)).toEqual([
+      'Warm Shard lights the party: +1 block.',
+      'Bone Charm wakes: the party gains Ward 1.',
+      'Silver Nest glitters: the enemy starts Marked.',
+    ]);
   });
 
   it('uses the authored M1 starter deck for Underroot fights and keeps S0 on the signature floor', () => {
