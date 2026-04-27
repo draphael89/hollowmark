@@ -1132,13 +1132,26 @@ function townServiceName(service: SliceState['townService']): string {
 }
 
 function townHint(state: SliceState): string {
+  if (state.townService === 'gate') return gateHint(state.townDebt);
   if (state.townService === 'vellum') return `Vellum deck ${M1_STARTER_CARDS.length} cards  ${vellumDeckCountsLine()}`;
   return `Service ${townServiceName(state.townService)}   Sanctuary debt ${state.townDebt}`;
 }
 
 function townHintColor(state: SliceState): string {
+  if (state.townService === 'gate' && state.townDebt > 0) return text.gold;
   if (state.townService === 'vellum') return text.cyan;
   return state.townDebt > 0 ? text.gold : text.mutedBone;
+}
+
+function gateHint(townDebt: number): string {
+  if (townDebt === 0) return 'Gate next dive: quiet stair';
+  return `Gate next dive: ${debtPressureName(townDebt)} from D${townDebt}`;
+}
+
+function debtPressureName(townDebt: number): string {
+  const pressure = townDebt * 4;
+  if (pressure >= 8) return 'roots hunting';
+  return 'roots listening';
 }
 
 function vellumDeckCountsLine(): string {
