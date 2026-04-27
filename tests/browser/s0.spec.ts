@@ -468,6 +468,12 @@ test('M2 browser smoke: unsettled town debt wakes pressure on the next dive', as
     expect(state.townHint).toBe('Gate next dive: roots listening from D1');
   });
 
+  await dispatchDebug(page, { type: 'choose-town-service', service: 'sanctuary' });
+  await expectDebugState(page, (state) => {
+    expect(state.townService).toBe('sanctuary');
+    expect(state.townHint).toBe('Sanctuary: settle D1 for quiet stair');
+  });
+  await dispatchDebug(page, { type: 'choose-town-service', service: 'gate' });
   await dispatchDebug(page, { type: 'enter-underroot' });
   await expectDebugState(page, (state) => {
     expect(state.mode).toBe('explore');
@@ -505,7 +511,7 @@ test('M2 browser smoke: Sanctuary settlement keeps the next stair quiet', async 
     expect(state.mode).toBe('town');
     expect(state.townDebt).toBe(0);
     expect(state.log.at(-1)).toBe('The Sanctuary settles D1. The next stair is quiet.');
-    expect(state.townHint).toBe('Service Sanctuary   Sanctuary debt 0');
+    expect(state.townHint).toBe('Sanctuary: no debt to settle');
   });
 
   await dispatchDebug(page, { type: 'enter-underroot' });
