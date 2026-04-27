@@ -39,7 +39,11 @@ declare global {
           path: string;
           approvalGate: string;
         }[];
-        enemySprite: null;
+        enemySprite: null | {
+          id: string;
+          path: string;
+          approvalGate: string;
+        };
       };
       feelSettings: FeelSettings;
       lastEvents: readonly GameEvent[];
@@ -82,7 +86,11 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
       path: '/assets/drafts/underroot/batch-01/blood-edge-preview-01.png',
       approvalGate: 'approved-for-gameplay',
     }],
-    enemySprite: null,
+    enemySprite: {
+      id: 'enemy.root-wolf.placeholder',
+      path: '/assets/drafts/underroot/batch-02/rootbitten-wolf-preview-01.png',
+      approvalGate: 'approved-for-gameplay',
+    },
   });
   const baselineObjects = combatStarted.objectCounts.total;
   expect(combatStarted.objectCounts.fx).toBe(0);
@@ -732,7 +740,11 @@ type DebugState = {
       path: string;
       approvalGate: string;
     }[];
-    enemySprite: null;
+    enemySprite: null | {
+      id: string;
+      path: string;
+      approvalGate: string;
+    };
   };
   objectCounts: {
     total: number;
