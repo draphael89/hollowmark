@@ -373,6 +373,26 @@ test('M2 browser smoke: lab run can seal the Underroot boss and show a town resu
   await dispatchDebug(page, { type: 'step-forward' });
   await dispatchDebug(page, { type: 'step-forward' });
   await dispatchDebug(page, { type: 'interact' });
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.log.at(-1)).toContain('stays shut');
+    expect(state.lastEvents).toEqual([{ type: 'INTERACT_NONE' }]);
+  });
+
+  await dispatchDebug(page, { type: 'step-back' });
+  await dispatchDebug(page, { type: 'step-back' });
+  await dispatchDebug(page, { type: 'turn-right' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'interact' });
+  await expectDebugState(page, (state) => {
+    expect(state.completedInteractions).toContain('underroot-reward-1');
+  });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'interact' });
+  await dispatchDebug(page, { type: 'turn-left' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'interact' });
   await expect.poll(async () => (await getDebugState(page)).combat?.enemy.id).toBe('underroot-alpha');
 
   await finishCurrentCombat(page);

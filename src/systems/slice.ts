@@ -224,6 +224,16 @@ function interact(state: SliceState): CommandResult {
 
 function resolveInteraction(state: SliceState, interaction: TileInteraction): CommandResult {
   if (interaction.type === 'combat') {
+    if (interaction.id === 'underroot-boss-1' && !canOpenBoss(state)) {
+      return {
+        state: {
+          ...state,
+          log: [...state.log, 'The larger root arch stays shut. Bring back a spoil or break a hunter first.'],
+        },
+        events: [{ type: 'INTERACT_NONE' }],
+      };
+    }
+
     const combat = createCombatForState(state, interaction.id);
     return {
       state: {
@@ -271,6 +281,10 @@ function resolveInteraction(state: SliceState, interaction: TileInteraction): Co
   }
 
   return assertNever(interaction);
+}
+
+function canOpenBoss(state: SliceState): boolean {
+  return countCompleted(state, 'underroot-reward-') > 0 || countCompleted(state, 'underroot-normal-') > 0 || countCompleted(state, 'underroot-elite-') > 0;
 }
 
 function createCombatForState(state: SliceState, interactionId: string): CombatState {
