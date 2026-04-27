@@ -22,7 +22,7 @@ describe('asset manifest', () => {
       ['underroot.corridor.placeholder', 'in_game_previewed'],
       ['underroot.combat.placeholder', 'approved'],
       ['enemy.root-wolf.placeholder', 'in_game_previewed'],
-      ['card.blood-edge.placeholder', 'in_game_previewed'],
+      ['card.blood-edge.placeholder', 'approved'],
       ['ui.ornaments.placeholder', 'rejected'],
     ]);
 
@@ -40,6 +40,7 @@ describe('asset manifest', () => {
     const gates = new Map(readGalleryAssets().map((asset) => [asset.id, asset.approvalGate]));
 
     expect(gates.get('underroot.combat.placeholder')).toBe('approved-for-gameplay');
+    expect(gates.get('card.blood-edge.placeholder')).toBe('approved-for-gameplay');
     expect(gates.get('ui.ornaments.placeholder')).toBe('blocked');
     expect(gates.get('enemy.root-wolf.placeholder')).toBe('needs-review');
   });
