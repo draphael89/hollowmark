@@ -12,6 +12,11 @@ const CARD_H = 58;
 const CARD_GAP_Y = 68;
 const DETAIL_W = 274;
 const SELECTED_PREVIEW = { x: 330, y: 276, w: 250, h: 58 };
+const SPOIL_REVIEW = [
+  { id: 'underroot-reward-1', spoil: 'Warm Shard', cue: 'Blk +D1', effect: 'party block' },
+  { id: 'underroot-reward-2', spoil: 'Bone Charm', cue: 'Wd +D1', effect: 'party ward' },
+  { id: 'underroot-reward-3', spoil: 'Silver Nest', cue: 'Mk +D1', effect: 'enemy mark' },
+] as const;
 
 export class VisualGalleryScene extends Phaser.Scene {
   private cardsGfx!: Phaser.GameObjects.Graphics;
@@ -69,6 +74,7 @@ export class VisualGalleryScene extends Phaser.Scene {
       fixedWidth: DETAIL_W,
       lineSpacing: 0,
     });
+    this.drawSpoilReview();
     this.label('Preview', SELECTED_PREVIEW.x, SELECTED_PREVIEW.y - 16, text.mutedBone);
     this.bindKeys();
     this.selectAsset(0);
@@ -76,6 +82,21 @@ export class VisualGalleryScene extends Phaser.Scene {
 
   private label(value: string, x: number, y: number, color: string): void {
     this.add.text(x, y, value, { ...textStyle, color });
+  }
+
+  private drawSpoilReview(): void {
+    const x = SELECTED_PREVIEW.x;
+    const y = 198;
+    const g = this.add.graphics();
+    g.fillStyle(colors.panelDeep, 1).fillRect(x, y, SELECTED_PREVIEW.w, 60);
+    g.lineStyle(1, colors.moss, 1).strokeRect(x, y, SELECTED_PREVIEW.w, 60);
+    this.label('Underroot Spoils', x + 10, y + 8, text.gold);
+    SPOIL_REVIEW.forEach((entry, index) => {
+      const lineY = y + 22 + index * 11;
+      this.label(entry.spoil, x + 10, lineY, text.bone);
+      this.label(entry.cue, x + 116, lineY, text.cyan);
+      this.label(entry.effect, x + 164, lineY, text.mutedBone);
+    });
   }
 
   private bindKeys(): void {
@@ -172,6 +193,7 @@ export class VisualGalleryScene extends Phaser.Scene {
         selectedReviewFocus: asset.reviewFocus,
         gameplayReadyAssetIds: this.assets.filter((entry) => entry.approvalGate === 'approved-for-gameplay').map((entry) => entry.id),
         stableIds: this.assets.map((entry) => entry.id),
+        spoilReview: SPOIL_REVIEW,
       },
     });
   }
