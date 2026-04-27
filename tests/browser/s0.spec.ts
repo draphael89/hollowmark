@@ -294,6 +294,7 @@ test('default route opens the playable Underroot dive from Marrowgate', async ({
     expect(state.mode).toBe('town');
     expect(state.floorId).toBe('underroot-m2-placeholder');
     expect(state.townService).toBe('gate');
+    expect(state.townHint).toBe('Gate next dive: quiet stair');
     expect(state.completedInteractions).toEqual([]);
   });
 
@@ -464,6 +465,7 @@ test('M2 browser smoke: unsettled town debt wakes pressure on the next dive', as
     expect(state.mode).toBe('town');
     expect(state.townDebt).toBe(1);
     expect(state.completedInteractions).toEqual(['underroot-reward-1', 'underroot-return-1']);
+    expect(state.townHint).toBe('Gate next dive: roots listening from D1');
   });
 
   await dispatchDebug(page, { type: 'enter-underroot' });
@@ -503,6 +505,7 @@ test('M2 browser smoke: Sanctuary settlement keeps the next stair quiet', async 
     expect(state.mode).toBe('town');
     expect(state.townDebt).toBe(0);
     expect(state.log.at(-1)).toBe('The Sanctuary settles D1. The next stair is quiet.');
+    expect(state.townHint).toBe('Service Sanctuary   Sanctuary debt 0');
   });
 
   await dispatchDebug(page, { type: 'enter-underroot' });
