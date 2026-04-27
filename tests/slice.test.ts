@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { M1_STARTER_CARDS, S0_CARDS } from '../src/data/combat';
 import { floorForId, UNDERROOT_M2_FLOOR_ID } from '../src/data/floors';
 import { cardInstanceId, type FloorDef, type TileCoord } from '../src/game/types';
+import { cardDefFor } from '../src/systems/combat';
 import { applyCommand, createSliceState, createTownState } from '../src/systems/slice';
 
 describe('mode-safe slice reducer', () => {
@@ -203,6 +205,29 @@ describe('mode-safe slice reducer', () => {
     expect(result.state.mode).toBe('combat');
     expect(result.state.combat?.heroes.every((hero) => hero.block === 2)).toBe(true);
     expect(result.state.log.at(-1)).toBe('Underroot spoils harden the party: +2 block.');
+  });
+
+  it('uses the authored M1 starter deck for Underroot fights and keeps S0 on the signature floor', () => {
+    const underroot = applyCommand(
+      {
+        ...createTownState('m2-underroot'),
+        mode: 'explore' as const,
+        position: { x: 0, y: 3 },
+        threat: 'hunted' as const,
+      },
+      { type: 'interact' },
+    );
+    let s0State = createSliceState();
+    s0State = applyCommand(s0State, { type: 'step-forward' }).state;
+    s0State = applyCommand(s0State, { type: 'step-forward' }).state;
+    const s0 = applyCommand(s0State, { type: 'interact' });
+
+    expect(underroot.state.combat?.hand).toHaveLength(5);
+    expect(underroot.state.combat?.drawPile).toHaveLength(M1_STARTER_CARDS.length - 5);
+    expect(new Set(Object.values(underroot.state.combat!.cards).map((card) => card.defId))).toEqual(new Set(M1_STARTER_CARDS.map((card) => card.id)));
+    expect(underroot.state.combat!.hand.map((cardId) => cardDefFor(underroot.state.combat!, cardId).id)).not.toEqual(S0_CARDS.map((card) => card.id));
+    expect(s0.state.combat?.drawPile).toHaveLength(0);
+    expect(s0.state.combat?.hand.map((cardId) => cardDefFor(s0.state.combat!, cardId).id)).toEqual(S0_CARDS.map((card) => card.id));
   });
 
   it('spends Underroot safety on each committed step', () => {

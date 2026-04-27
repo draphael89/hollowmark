@@ -1,5 +1,6 @@
 import type { CardInstanceId, CombatCommand, ExploreCommand, GameEvent, SliceCommand, SliceState, TileInteraction, TownCommand } from '../game/types';
-import { createCombat, endTurn, holdCard, playCard } from './combat';
+import { M1_STARTER_CARDS } from '../data/combat';
+import { createCombat, createCombatWithCards, endTurn, holdCard, playCard } from './combat';
 import { floorForId, START_FLOOR_ID, UNDERROOT_M2_FLOOR_ID } from '../data/floors';
 import { START_FACING, START_POSITION, attemptStep, turnFacing } from './movement';
 import { threatAt, tileAt } from './floor';
@@ -273,7 +274,7 @@ function resolveInteraction(state: SliceState, interaction: TileInteraction): Co
 }
 
 function createCombatForState(state: SliceState) {
-  const combat = createCombat(state.seed);
+  const combat = state.floorId === UNDERROOT_M2_FLOOR_ID ? createCombatWithCards(state.seed, M1_STARTER_CARDS) : createCombat(state.seed);
   const spoilCount = countCompleted(state, 'underroot-reward-');
   if (spoilCount === 0) return combat;
 
