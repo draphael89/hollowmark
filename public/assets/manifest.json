@@ -16,11 +16,11 @@
         "h": 220
       },
       "palette": "draft-generated",
-      "cropNotes": "Center-cropped and downsampled to 392x220. Strong depth read; possible pseudo-glyphs on side stones need human review before approval.",
+      "cropNotes": "Center-cropped and downsampled to 392x220. Strong depth read; side-stone ornament bands were reviewed at game scale and do not read as text.",
       "matteOrMaskNotes": "Not applicable for full plate.",
-      "humanEditNotes": "Batch 01 draft previewed in Visual Gallery. Keep for art-direction review; do not approve until pseudo-glyph risk is checked.",
+      "humanEditNotes": "Batch 01 draft previewed in Visual Gallery. Approved for future manifest-gated dungeon plate wiring; no generated text was visible at 392x220 review scale.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "in_game_previewed",
+      "approvalState": "approved",
       "rejectionNotes": null
     },
     {

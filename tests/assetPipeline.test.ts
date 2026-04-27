@@ -57,11 +57,16 @@ describe('asset production foundation', () => {
     expect(rejected[0]?.rejectionNotes).toContain('Rejected for approval');
   });
 
-  it('approves only the combat background from the first composition pass', () => {
+  it('approves the reviewed first-batch assets without advancing review candidates', () => {
     const manifest = readAssetManifest();
     const approved = manifest.assets.filter((asset) => asset.approvalState === 'approved');
 
-    expect(approved.map((asset) => asset.id)).toEqual(['underroot.combat.placeholder', 'card.blood-edge.placeholder']);
+    expect(approved.map((asset) => asset.id)).toEqual([
+      'underroot.corridor.placeholder',
+      'underroot.combat.placeholder',
+      'card.blood-edge.placeholder',
+    ]);
+    expect(approved.find((asset) => asset.id === 'underroot.corridor.placeholder')?.humanEditNotes).toContain('no generated text');
     expect(approved.find((asset) => asset.id === 'underroot.combat.placeholder')?.humanEditNotes).toContain('Combat Sandbox composition review');
     expect(approved.find((asset) => asset.id === 'underroot.combat.placeholder')?.inGamePreview).toBe('?scene=combat-sandbox');
     expect(approved.find((asset) => asset.id === 'card.blood-edge.placeholder')?.humanEditNotes).toContain('tiny-crop review');
