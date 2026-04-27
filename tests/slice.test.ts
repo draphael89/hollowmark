@@ -246,6 +246,7 @@ describe('mode-safe slice reducer', () => {
         mode: 'explore' as const,
         position: { x: 1, y: 1 },
         threat: 'hunted' as const,
+        completedInteractions: ['underroot-reward-1'],
       },
       { type: 'interact' },
     );
@@ -319,7 +320,7 @@ describe('mode-safe slice reducer', () => {
 
   it('returns to Marrowgate after the placeholder boss fight', () => {
     let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
-    state = applyCommand({ ...state, position: { x: 1, y: 1 }, threat: 'hunted' }, { type: 'interact' }).state;
+    state = applyCommand({ ...state, position: { x: 1, y: 1 }, threat: 'hunted', completedInteractions: ['underroot-reward-1'] }, { type: 'interact' }).state;
     state = {
       ...state,
       combat: {
@@ -336,6 +337,40 @@ describe('mode-safe slice reducer', () => {
     expect(result.state.completedInteractions).toContain('underroot-boss-1');
     expect(result.state.log.at(-1)).toBe('Marrowgate bells answer: the Underroot Alpha is sealed.');
     expect(result.events).toContainEqual({ type: 'MARROWGATE_RETURNED' });
+  });
+
+  it('keeps the boss gate shut until the dive proves a spoil or hunter branch', () => {
+    const blocked = applyCommand(
+      {
+        ...createTownState('m2-underroot'),
+        mode: 'explore' as const,
+        position: { x: 1, y: 1 },
+        threat: 'hunted' as const,
+      },
+      { type: 'interact' },
+    );
+    const rewarded = applyCommand(
+      {
+        ...blocked.state,
+        completedInteractions: ['underroot-reward-1'],
+      },
+      { type: 'interact' },
+    );
+    const blooded = applyCommand(
+      {
+        ...blocked.state,
+        completedInteractions: ['underroot-normal-1'],
+      },
+      { type: 'interact' },
+    );
+
+    expect(blocked.state.mode).toBe('explore');
+    expect(blocked.state.log.at(-1)).toContain('stays shut');
+    expect(blocked.events).toEqual([{ type: 'INTERACT_NONE' }]);
+    expect(rewarded.state.mode).toBe('combat');
+    expect(rewarded.state.combat?.enemy.id).toBe('underroot-alpha');
+    expect(blooded.state.mode).toBe('combat');
+    expect(blooded.state.combat?.enemy.id).toBe('underroot-alpha');
   });
 
   it('returns to Underroot exploration after a normal placeholder fight', () => {

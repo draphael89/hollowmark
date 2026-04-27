@@ -429,8 +429,9 @@ export class S0Scene extends Phaser.Scene {
       g.fillStyle(colors.gold, 1)
         .fillCircle(viewport.huntedEyeLeft.x, viewport.huntedEyeLeft.y, viewport.huntedEyeLeft.radius)
         .fillCircle(viewport.huntedEyeRight.x, viewport.huntedEyeRight.y, viewport.huntedEyeRight.radius);
-      this.label('Rootbitten Wolf', viewport.huntedName.x, viewport.huntedName.y, text.gold);
-      this.label('Intent: Bite 6', viewport.huntedIntent.x, viewport.huntedIntent.y, text.red);
+      const preview = encounterPreview(current.tile, front.tile);
+      this.label(preview.name, viewport.huntedName.x, viewport.huntedName.y, text.gold);
+      this.label(preview.intent, viewport.huntedIntent.x, viewport.huntedIntent.y, text.red);
     }
 
     this.label(`Facing ${this.state.facing.toUpperCase()}  ${current.coord.x},${current.coord.y}`, viewport.facingLabel.x, viewport.facingLabel.y);
@@ -1011,6 +1012,13 @@ function marrowgateRunLine(state: SliceState): string {
   return 'Run open  Enter the Underroot';
 }
 
+function encounterPreview(current: FloorTile | null, front: FloorTile | null): { name: string; intent: string } {
+  const interactionId = current?.interaction?.type === 'combat' ? current.interaction.id : front?.interaction?.type === 'combat' ? front.interaction.id : null;
+  if (interactionId === 'underroot-boss-1') return { name: 'Underroot Alpha', intent: 'Intent: Bite 10' };
+  if (interactionId === 'underroot-elite-1') return { name: 'Root-Knotted Brute', intent: 'Intent: Bite 8' };
+  return { name: 'Rootbitten Wolf', intent: 'Intent: Bite 6' };
+}
+
 function tileCue(prefix: 'Here' | 'Ahead', tile: FloorTile | null, state: SliceState): string {
   const purpose = tile?.purpose ?? 'side-path';
   if (tile?.interaction?.type === 'reward') {
@@ -1026,8 +1034,15 @@ function tileCue(prefix: 'Here' | 'Ahead', tile: FloorTile | null, state: SliceS
     return `${purposeIcon(purpose)} ${prefix}: ${claimed}`;
   }
   if (tile?.interaction?.type === 'return-town') return `${purposeIcon(purpose)} ${prefix}: return`;
-  if (tile?.interaction?.type === 'combat') return `${purposeIcon(purpose)} ${prefix}: fight`;
+  if (tile?.interaction?.type === 'combat') {
+    if (tile.interaction.id === 'underroot-boss-1' && !canOpenBossCue(state)) return `${purposeIcon(purpose)} ${prefix}: boss sealed`;
+    return `${purposeIcon(purpose)} ${prefix}: fight`;
+  }
   return `${purposeIcon(purpose)} ${prefix}: ${purposeLabel(purpose)}`;
+}
+
+function canOpenBossCue(state: SliceState): boolean {
+  return countCompleted(state, 'underroot-reward-') > 0 || countCompleted(state, 'underroot-normal-') > 0 || countCompleted(state, 'underroot-elite-') > 0;
 }
 
 function claimedSpoilsLine(state: SliceState): string {
