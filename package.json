@@ -8,6 +8,7 @@
     "dev": "vite",
     "asset:audit": "node scripts/audit-assets.mjs",
     "asset:contact-sheet": "node scripts/create-contact-sheet.mjs",
+    "asset:matte-wolf": "node scripts/matte-sprite.mjs .curation/raw/underroot/batch-01/rootbitten-wolf-draft-01.png public/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png 96 128 18",
     "asset:process-batch": "node scripts/process-underroot-batch.mjs",
     "test": "vitest run tests/*.test.ts",
     "test:browser": "playwright test",

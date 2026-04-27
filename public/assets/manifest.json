@@ -18,9 +18,9 @@
       "palette": "draft-generated",
       "cropNotes": "Center-cropped and downsampled to 392x220. Strong depth read; possible pseudo-glyphs on side stones need human review before approval.",
       "matteOrMaskNotes": "Not applicable for full plate.",
-      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
+      "humanEditNotes": "Batch 01 draft previewed in Visual Gallery. Keep for art-direction review; do not approve until pseudo-glyph risk is checked.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "processed",
+      "approvalState": "in_game_previewed",
       "rejectionNotes": null
     },
     {
@@ -40,9 +40,9 @@
       "palette": "draft-generated",
       "cropNotes": "Center-cropped and downsampled to 392x220. Good enemy stage and floor contact read.",
       "matteOrMaskNotes": "Not applicable for full plate.",
-      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
+      "humanEditNotes": "Batch 01 draft previewed in Visual Gallery. Strongest first background candidate; ready for approval review after final no-text pass.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "processed",
+      "approvalState": "in_game_previewed",
       "rejectionNotes": null
     },
     {
@@ -54,17 +54,17 @@
       "reviewFocus": "silhouette, intent read, hit flash",
       "sourceInputs": [],
       "rawSource": ".curation/raw/underroot/batch-01/rootbitten-wolf-draft-01.png",
-      "processedPath": "public/assets/drafts/underroot/batch-01/rootbitten-wolf-preview-01.png",
+      "processedPath": "public/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png",
       "finalSize": {
         "w": 96,
         "h": 128
       },
       "palette": "draft-generated",
       "cropNotes": "Downsampled to 96x128. Silhouette is strong; future matte pass must separate near-black background cleanly.",
-      "matteOrMaskNotes": "Raw source uses near-black matte, not transparency. Alpha extraction remains pending.",
-      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
+      "matteOrMaskNotes": "Near-black matte removed with threshold 18 into a transparent 96x128 preview. Edge cleanup still needs human review before approval.",
+      "humanEditNotes": "Batch 01 draft matted and previewed in Visual Gallery. Strong silhouette; not approved until edge cleanup and combat-background composition pass.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "processed",
+      "approvalState": "in_game_previewed",
       "rejectionNotes": null
     },
     {
@@ -84,9 +84,9 @@
       "palette": "draft-generated",
       "cropNotes": "Center-cropped and downsampled to 64x48. Blade reads at tiny size; abstract wall marks must be checked for accidental text.",
       "matteOrMaskNotes": "Not applicable for card crop.",
-      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
+      "humanEditNotes": "Batch 01 draft previewed in Visual Gallery. Tiny crop reads; do not approve until accidental wall-glyph review is complete.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "processed",
+      "approvalState": "in_game_previewed",
       "rejectionNotes": null
     },
     {
@@ -106,10 +106,10 @@
       "palette": "draft-generated",
       "cropNotes": "Center-cropped to 1024x1024 for preview. Source is strong but landscape; final UI slicing should return to raw source or request square composition.",
       "matteOrMaskNotes": "Dark matte separation remains pending.",
-      "humanEditNotes": "Low-quality draft 01 selected for preview only.",
+      "humanEditNotes": "Batch 01 draft reviewed in Visual Gallery. Strong motifs but wrong sheet composition for approval.",
       "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "processed",
-      "rejectionNotes": "Needs square-sheet or deliberate slicing pass before approval."
+      "approvalState": "rejected",
+      "rejectionNotes": "Rejected for approval: landscape source loses too many elements in square preview. Rerun with strict square-sheet composition or slice deliberately from raw source."
     }
   ]
 }

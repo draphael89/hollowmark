@@ -11,7 +11,9 @@ type AssetPassport = {
   rawSource: string | null;
   processedPath: string | null;
   finalSize: { w: number; h: number };
+  matteOrMaskNotes: string;
   approvalState: string;
+  rejectionNotes: string | null;
 };
 
 describe('asset production foundation', () => {
@@ -31,7 +33,7 @@ describe('asset production foundation', () => {
     const manifest = readAssetManifest();
 
     for (const asset of manifest.assets) {
-      expect(asset.approvalState).toBe('processed');
+      expect(['in_game_previewed', 'rejected']).toContain(asset.approvalState);
       expect(asset.title.length).toBeGreaterThan(0);
       expect(asset.reviewFocus.length).toBeGreaterThan(0);
       expect(asset.rawSource).toMatch(new RegExp('^\\.curation/raw/underroot/batch-01/.+\\.png$'));
@@ -43,6 +45,23 @@ describe('asset production foundation', () => {
       const prompt = readFileSync(asset.promptPath, 'utf8');
       expect(prompt).toMatch(/no text|no words|readable text/);
     }
+  });
+
+  it('records rejection notes for assets that should not advance', () => {
+    const manifest = readAssetManifest();
+    const rejected = manifest.assets.filter((asset) => asset.approvalState === 'rejected');
+
+    expect(rejected.map((asset) => asset.id)).toEqual(['ui.ornaments.placeholder']);
+    expect(rejected[0]?.rejectionNotes).toContain('Rejected for approval');
+  });
+
+  it('tracks the wolf matte preview separately from the raw draft', () => {
+    const manifest = readAssetManifest();
+    const wolf = manifest.assets.find((asset) => asset.id === 'enemy.root-wolf.placeholder');
+
+    expect(wolf?.approvalState).toBe('in_game_previewed');
+    expect(wolf?.processedPath).toBe('public/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png');
+    expect(wolf?.matteOrMaskNotes).toContain('Near-black matte removed');
   });
 });
 
