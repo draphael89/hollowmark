@@ -22,7 +22,7 @@ const COMBAT_PREVIEW = {
   backgroundApprovalState: 'approved',
   enemyId: 'enemy.root-wolf.placeholder',
   enemyKey: 'rootbitten-wolf-matte-preview',
-  enemyPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png',
+  enemyPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-clean-preview-01.png',
   enemyApprovalState: 'in_game_previewed',
   compositionGate: 'needs-review',
 } as const;

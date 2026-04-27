@@ -56,7 +56,7 @@ test('combat sandbox previews cues without rebuilding the shell', async ({ page 
     backgroundPath: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
     backgroundApprovalState: 'approved',
     enemyId: 'enemy.root-wolf.placeholder',
-    enemyPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png',
+    enemyPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-clean-preview-01.png',
     enemyApprovalState: 'in_game_previewed',
     compositionGate: 'needs-review',
   });

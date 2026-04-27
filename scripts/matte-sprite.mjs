@@ -40,11 +40,59 @@ try {
     context.drawImage(image, sourceX, sourceY, sourceW, sourceH, 0, 0, targetW, targetH);
 
     const pixels = context.getImageData(0, 0, targetW, targetH);
-    for (let index = 0; index < pixels.data.length; index += 4) {
+    const transparent = new Uint8Array(targetW * targetH);
+    const edgeTransparent = new Uint8Array(targetW * targetH);
+    const queue = [];
+
+    for (let pixel = 0; pixel < transparent.length; pixel += 1) {
+      const index = pixel * 4;
       const r = pixels.data[index];
       const g = pixels.data[index + 1];
       const b = pixels.data[index + 2];
-      if (Math.max(r, g, b) <= threshold) pixels.data[index + 3] = 0;
+      if (Math.max(r, g, b) <= threshold) transparent[pixel] = 1;
+    }
+
+    const enqueue = (x, y) => {
+      if (x < 0 || y < 0 || x >= targetW || y >= targetH) return;
+      const pixel = y * targetW + x;
+      if (edgeTransparent[pixel] || !transparent[pixel]) return;
+      edgeTransparent[pixel] = 1;
+      queue.push(pixel);
+    };
+
+    for (let x = 0; x < targetW; x += 1) {
+      enqueue(x, 0);
+      enqueue(x, targetH - 1);
+    }
+    for (let y = 0; y < targetH; y += 1) {
+      enqueue(0, y);
+      enqueue(targetW - 1, y);
+    }
+
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const pixel = queue[cursor];
+      const x = pixel % targetW;
+      const y = Math.floor(pixel / targetW);
+      enqueue(x + 1, y);
+      enqueue(x - 1, y);
+      enqueue(x, y + 1);
+      enqueue(x, y - 1);
+    }
+
+    for (let pixel = 0; pixel < transparent.length; pixel += 1) {
+      const index = pixel * 4;
+      if (edgeTransparent[pixel]) {
+        pixels.data[index + 3] = 0;
+        continue;
+      }
+      const x = pixel % targetW;
+      const y = Math.floor(pixel / targetW);
+      const touchesMatte =
+        (x > 0 && edgeTransparent[pixel - 1]) ||
+        (x < targetW - 1 && edgeTransparent[pixel + 1]) ||
+        (y > 0 && edgeTransparent[pixel - targetW]) ||
+        (y < targetH - 1 && edgeTransparent[pixel + targetW]);
+      if (touchesMatte) pixels.data[index + 3] = Math.round(pixels.data[index + 3] * 0.82);
     }
     context.putImageData(pixels, 0, 0);
     return canvas.toDataURL('image/png');
