@@ -382,6 +382,7 @@ describe('mode-safe slice reducer', () => {
     expect(vellum.state.townService).toBe('vellum');
     expect(vellum.state.townDebt).toBe(1);
     expect(vellum.state.completedInteractions).toEqual(['underroot-reward-1']);
+    expect(vellum.state.log.at(-1)).toBe('The Vellum lays 24 starter cards in a careful grid.');
     expect(vellum.events).toContainEqual({ type: 'TOWN_SERVICE_SELECTED', service: 'vellum' });
 
     const gate = applyCommand(vellum.state, { type: 'choose-town-service', service: 'gate' });

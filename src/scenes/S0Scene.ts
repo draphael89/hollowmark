@@ -30,6 +30,7 @@ declare global {
       selectedCardHint: string | null;
       selectedCardSummary: string | null;
       selectedStatusRule: string | null;
+      townHint: string | null;
       intentText: string | null;
       gameplayAssets: {
         explorationBackground: null | {
@@ -67,6 +68,7 @@ const textStyle = THEME.textStyle;
 const layout = S0_LAYOUT;
 const SAVE_KEY = 'hollowmark:s0-save';
 const M1_COMBAT_SEED = 'm1-natural-19';
+const HERO_IDS: readonly HeroId[] = ['liese', 'eris', 'mia', 'robin'];
 const GAMEPLAY_EXPLORATION_BACKGROUND = {
   id: 'underroot.corridor.placeholder',
   key: 'gameplay-underroot-corridor-background',
@@ -554,7 +556,7 @@ export class S0Scene extends Phaser.Scene {
     const tray = layout.tray;
     if (this.state.mode === 'town') {
       this.label(this.state.log.slice(-2).join('\n'), tray.log.x, tray.log.y);
-      this.label(`Service ${townServiceName(this.state.townService)}   Sanctuary debt ${this.state.townDebt}`, tray.exploreHint.x, tray.exploreHint.y - 14, this.state.townDebt > 0 ? text.gold : text.mutedBone);
+      this.label(townHint(this.state), tray.exploreHint.x, tray.exploreHint.y - 14, townHintColor(this.state));
       this.label('Space/G Gate   V Vellum   C Sanctuary', tray.exploreHint.x, tray.exploreHint.y, text.cyan);
       return;
     }
@@ -970,6 +972,7 @@ export class S0Scene extends Phaser.Scene {
       selectedCardHint: this.selectedCardId ? this.selectedCardHint() : null,
       selectedCardSummary: this.selectedCardId && this.state.combat ? cardSummary(cardDefFor(this.state.combat, this.selectedCardId)) : null,
       selectedStatusRule: this.selectedStatusRule(),
+      townHint: this.state.mode === 'town' ? townHint(this.state) : null,
       intentText: this.state.combat ? renderIntentText(this.state.combat.enemy.intent) : null,
       gameplayAssets: {
         explorationBackground: this.explorationBackground,
@@ -1126,6 +1129,24 @@ function townServiceName(service: SliceState['townService']): string {
   if (service === 'gate') return 'Gate';
   if (service === 'vellum') return 'Vellum';
   return 'Sanctuary';
+}
+
+function townHint(state: SliceState): string {
+  if (state.townService === 'vellum') return `Vellum deck ${M1_STARTER_CARDS.length} cards  ${vellumDeckCountsLine()}`;
+  return `Service ${townServiceName(state.townService)}   Sanctuary debt ${state.townDebt}`;
+}
+
+function townHintColor(state: SliceState): string {
+  if (state.townService === 'vellum') return text.cyan;
+  return state.townDebt > 0 ? text.gold : text.mutedBone;
+}
+
+function vellumDeckCountsLine(): string {
+  return HERO_IDS.map((heroId) => `${heroCode(heroId)}${cardsForHero(heroId)}`).join(' ');
+}
+
+function cardsForHero(heroId: HeroId): number {
+  return M1_STARTER_CARDS.filter((card) => card.owner === heroId).length;
 }
 
 function heroIndex(heroId: HeroId): number {

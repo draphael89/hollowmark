@@ -22,6 +22,7 @@ declare global {
       selectedCardHint: string | null;
       selectedCardSummary: string | null;
       selectedStatusRule: string | null;
+      townHint: string | null;
       intentText: string | null;
       gameplayAssets: {
         explorationBackground: null | {
@@ -322,6 +323,7 @@ test('M2 browser smoke: Marrowgate enters Underroot and returns with tile progre
   await dispatchDebug(page, { type: 'choose-town-service', service: 'vellum' });
   await expectDebugState(page, (state) => {
     expect(state.townService).toBe('vellum');
+    expect(state.townHint).toBe('Vellum deck 24 cards  LIE6 ERI6 MIA6 ROB6');
     expect(state.lastEvents).toContainEqual({ type: 'TOWN_SERVICE_SELECTED', service: 'vellum' });
   });
 
@@ -993,6 +995,7 @@ type DebugState = {
   selectedCardHint: string | null;
   selectedCardSummary: string | null;
   selectedStatusRule: string | null;
+  townHint: string | null;
   feelSettings: FeelSettings;
   lastEvents: readonly GameEvent[];
 };
@@ -1012,6 +1015,7 @@ async function getDebugState(page: Page): Promise<SliceState & DebugState> {
     selectedCardHint: debug.selectedCardHint,
     selectedCardSummary: debug.selectedCardSummary,
     selectedStatusRule: debug.selectedStatusRule,
+    townHint: debug.townHint,
     feelSettings: debug.feelSettings,
     lastEvents: debug.lastEvents,
   };
