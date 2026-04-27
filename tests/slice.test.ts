@@ -141,12 +141,14 @@ describe('mode-safe slice reducer', () => {
     const floor = floorForId(UNDERROOT_M2_FLOOR_ID);
     const interactions = floor.tiles.flatMap((tile) => tile.interaction ? [tile.interaction] : []);
     const combatIds = interactions.filter((interaction) => interaction.type === 'combat').map((interaction) => interaction.id);
+    const rewardSpoils = interactions.flatMap((interaction) => interaction.type === 'reward' ? [interaction.spoil] : []);
 
     expect(floor.tiles).toHaveLength(15);
     expect(combatIds.filter((id) => id.startsWith('underroot-normal-'))).toHaveLength(5);
     expect(combatIds).toContain('underroot-elite-1');
     expect(combatIds).toContain('underroot-boss-1');
     expect(interactions.filter((interaction) => interaction.type === 'reward')).toHaveLength(3);
+    expect(rewardSpoils).toEqual(['Bone Charm', 'Warm Shard', 'Silver Nest']);
     expect(interactions.filter((interaction) => interaction.type === 'rest')).toHaveLength(1);
     expect(interactions.filter((interaction) => interaction.type === 'shortcut')).toHaveLength(1);
     expect(interactions.filter((interaction) => interaction.type === 'return-town')).toHaveLength(1);
@@ -175,6 +177,7 @@ describe('mode-safe slice reducer', () => {
     expect(reward.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-reward-1', interaction: 'reward' });
     expect(reward.state.completedInteractions).toContain('underroot-reward-1');
     expect(reward.state.townDebt).toBe(1);
+    expect(reward.state.log.at(-1)).toContain('warm shard');
 
     state = applyCommand(reward.state, { type: 'step-forward' }).state;
     expect(state.position).toEqual({ x: 3, y: 3 });
@@ -183,6 +186,23 @@ describe('mode-safe slice reducer', () => {
     expect(shortcut.events).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-shortcut-1', interaction: 'shortcut' });
     expect(shortcut.state.position).toEqual({ x: 1, y: 3 });
     expect(shortcut.state.townDebt).toBe(2);
+  });
+
+  it('turns claimed Underroot rewards into starting combat block', () => {
+    const state = {
+      ...createTownState('m2-underroot'),
+      mode: 'explore' as const,
+      position: { x: 0, y: 3 },
+      threat: 'hunted' as const,
+      completedInteractions: ['underroot-reward-1', 'underroot-reward-2'],
+      townDebt: 2,
+    };
+
+    const result = applyCommand(state, { type: 'interact' });
+
+    expect(result.state.mode).toBe('combat');
+    expect(result.state.combat?.heroes.every((hero) => hero.block === 2)).toBe(true);
+    expect(result.state.log.at(-1)).toBe('Underroot spoils harden the party: +2 block.');
   });
 
   it('spends Underroot safety on each committed step', () => {

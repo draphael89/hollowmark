@@ -108,6 +108,7 @@ export const UNDERROOT_M2_FLOOR: FloorDef = {
       interaction: {
         type: 'reward',
         id: 'underroot-reward-2',
+        spoil: 'Bone Charm',
         debt: 1,
         logLine: 'The bone charms warm your palms and add a future favor.',
       },
@@ -147,6 +148,7 @@ export const UNDERROOT_M2_FLOOR: FloorDef = {
       interaction: {
         type: 'reward',
         id: 'underroot-reward-1',
+        spoil: 'Warm Shard',
         debt: 1,
         logLine: 'The reliquary gives a warm shard and asks for a future favor.',
       },
@@ -248,6 +250,7 @@ export const UNDERROOT_M2_FLOOR: FloorDef = {
       interaction: {
         type: 'reward',
         id: 'underroot-reward-3',
+        spoil: 'Silver Nest',
         debt: 1,
         logLine: 'The silver nest breaks open and marks one more debt.',
       },

@@ -15,7 +15,7 @@ export type TilePurpose = 'start' | 'approach' | 'encounter' | 'side-path' | 're
 export type TileInteraction =
   | Readonly<{ type: 'combat'; id: string; returnTo: 'explore' | 'town' | 'victory'; logLine: string }>
   | Readonly<{ type: 'rest'; id: string; logLine: string }>
-  | Readonly<{ type: 'reward'; id: string; debt: number; logLine: string }>
+  | Readonly<{ type: 'reward'; id: string; spoil: string; debt: number; logLine: string }>
   | Readonly<{ type: 'shortcut'; id: string; to: TileCoord; debt: number; logLine: string }>
   | Readonly<{ type: 'return-town'; id: string; logLine: string }>;
 

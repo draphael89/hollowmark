@@ -223,14 +223,15 @@ function interact(state: SliceState): CommandResult {
 
 function resolveInteraction(state: SliceState, interaction: TileInteraction): CommandResult {
   if (interaction.type === 'combat') {
+    const combat = createCombatForState(state);
     return {
       state: {
         ...state,
         mode: 'combat',
-        combat: createCombat(state.seed),
+        combat,
         activeInteractionId: interaction.id,
         combatReturn: interaction.returnTo,
-        log: [...state.log, interaction.logLine],
+        log: [...state.log, interaction.logLine, ...spoilCombatLog(state)],
       },
       events: [{ type: 'COMBAT_STARTED' }],
     };
@@ -269,6 +270,31 @@ function resolveInteraction(state: SliceState, interaction: TileInteraction): Co
   }
 
   return assertNever(interaction);
+}
+
+function createCombatForState(state: SliceState) {
+  const combat = createCombat(state.seed);
+  const spoilCount = countCompleted(state, 'underroot-reward-');
+  if (spoilCount === 0) return combat;
+
+  return {
+    ...combat,
+    heroes: combat.heroes.map((hero) => ({
+      ...hero,
+      block: hero.block + spoilCount,
+    })),
+  };
+}
+
+function spoilCombatLog(state: SliceState): string[] {
+  const spoilCount = countCompleted(state, 'underroot-reward-');
+  if (spoilCount === 0) return [];
+  if (spoilCount === 1) return ['An Underroot spoil hardens the party: +1 block.'];
+  return [`Underroot spoils harden the party: +${spoilCount} block.`];
+}
+
+function countCompleted(state: SliceState, prefix: string): number {
+  return state.completedInteractions.filter((id) => id.startsWith(prefix)).length;
 }
 
 function completeInteraction(
