@@ -19,7 +19,7 @@ describe('asset manifest', () => {
 
   it('derives gallery entries from public passports', () => {
     const expectedStates = new Map([
-      ['underroot.corridor.placeholder', 'in_game_previewed'],
+      ['underroot.corridor.placeholder', 'approved'],
       ['underroot.combat.placeholder', 'approved'],
       ['enemy.root-wolf.placeholder', 'in_game_previewed'],
       ['card.blood-edge.placeholder', 'approved'],
@@ -40,6 +40,7 @@ describe('asset manifest', () => {
     const gates = new Map(readGalleryAssets().map((asset) => [asset.id, asset.approvalGate]));
 
     expect(gates.get('underroot.combat.placeholder')).toBe('approved-for-gameplay');
+    expect(gates.get('underroot.corridor.placeholder')).toBe('approved-for-gameplay');
     expect(gates.get('card.blood-edge.placeholder')).toBe('approved-for-gameplay');
     expect(gates.get('ui.ornaments.placeholder')).toBe('blocked');
     expect(gates.get('enemy.root-wolf.placeholder')).toBe('needs-review');
