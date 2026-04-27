@@ -28,6 +28,12 @@ declare global {
           path: string;
           approvalGate: string;
         };
+        cardArt: readonly {
+          cardId: string;
+          assetId: string;
+          path: string;
+          approvalGate: string;
+        }[];
         enemySprite: null;
       };
       feelSettings: FeelSettings;
@@ -60,6 +66,12 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
       path: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
       approvalGate: 'approved-for-gameplay',
     },
+    cardArt: [{
+      cardId: 'blood-edge',
+      assetId: 'card.blood-edge.placeholder',
+      path: '/assets/drafts/underroot/batch-01/blood-edge-preview-01.png',
+      approvalGate: 'approved-for-gameplay',
+    }],
     enemySprite: null,
   });
   const baselineObjects = combatStarted.objectCounts.total;
@@ -631,6 +643,7 @@ async function startFresh(page: Page) {
 }
 
 async function enterS0Combat(page: Page) {
+  await getDebugState(page);
   await page.keyboard.press('KeyW');
   await expect.poll(async () => (await getDebugState(page)).position).toEqual({ x: 1, y: 2 });
   await page.keyboard.press('KeyW');
@@ -698,6 +711,12 @@ type DebugState = {
       path: string;
       approvalGate: string;
     };
+    cardArt: readonly {
+      cardId: string;
+      assetId: string;
+      path: string;
+      approvalGate: string;
+    }[];
     enemySprite: null;
   };
   objectCounts: {
