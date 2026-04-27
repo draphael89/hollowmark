@@ -247,6 +247,11 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
     'card.blood-edge.placeholder',
     'ui.ornaments.placeholder',
   ]);
+  expect(debug.visualGallery?.spoilReview).toEqual([
+    { id: 'underroot-reward-1', spoil: 'Warm Shard', cue: 'Blk +D1', effect: 'party block' },
+    { id: 'underroot-reward-2', spoil: 'Bone Charm', cue: 'Wd +D1', effect: 'party ward' },
+    { id: 'underroot-reward-3', spoil: 'Silver Nest', cue: 'Mk +D1', effect: 'enemy mark' },
+  ]);
 
   await page.keyboard.press('Digit4');
   await expect.poll(async () => (await getDevDebug(page)).label).toBe('card.blood-edge.placeholder');

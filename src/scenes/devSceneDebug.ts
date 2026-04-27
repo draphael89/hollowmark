@@ -65,6 +65,12 @@ export type DevSceneDebug = {
     selectedReviewFocus: string;
     gameplayReadyAssetIds: readonly string[];
     stableIds: readonly string[];
+    spoilReview: readonly {
+      id: string;
+      spoil: string;
+      cue: string;
+      effect: string;
+    }[];
   };
   scenarioLab?: {
     id: string;
