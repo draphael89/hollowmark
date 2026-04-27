@@ -54,15 +54,15 @@
       "reviewFocus": "silhouette, intent read, hit flash",
       "sourceInputs": [],
       "rawSource": ".curation/raw/underroot/batch-01/rootbitten-wolf-draft-01.png",
-      "processedPath": "public/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png",
+      "processedPath": "public/assets/drafts/underroot/batch-01/rootbitten-wolf-clean-preview-01.png",
       "finalSize": {
         "w": 96,
         "h": 128
       },
       "palette": "draft-generated",
       "cropNotes": "Downsampled to 96x128. Silhouette is strong; future matte pass must separate near-black background cleanly.",
-      "matteOrMaskNotes": "Near-black matte removed with threshold 18 into a transparent 96x128 preview. Edge cleanup still needs human review before approval.",
-      "humanEditNotes": "Batch 01 draft matted and previewed in Visual Gallery. Strong silhouette; not approved until edge cleanup and combat-background composition pass.",
+      "matteOrMaskNotes": "Near-black matte removed with threshold 18, then enclosed transparent holes are restored to preserve body shadow detail. Edge cleanup still needs human review before approval.",
+      "humanEditNotes": "Batch 01 draft cleaned and previewed in Visual Gallery plus Combat Sandbox. Stronger combat read; not approved until edge cleanup receives human art review.",
       "inGamePreview": "?scene=visual-gallery",
       "approvalState": "in_game_previewed",
       "rejectionNotes": null

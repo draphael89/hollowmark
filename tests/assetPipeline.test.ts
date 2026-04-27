@@ -71,8 +71,10 @@ describe('asset production foundation', () => {
     const wolf = manifest.assets.find((asset) => asset.id === 'enemy.root-wolf.placeholder');
 
     expect(wolf?.approvalState).toBe('in_game_previewed');
-    expect(wolf?.processedPath).toBe('public/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png');
+    expect(wolf?.processedPath).toBe('public/assets/drafts/underroot/batch-01/rootbitten-wolf-clean-preview-01.png');
     expect(wolf?.matteOrMaskNotes).toContain('Near-black matte removed');
+    expect(wolf?.matteOrMaskNotes).toContain('enclosed transparent holes are restored');
+    expect(wolf?.humanEditNotes).toContain('not approved');
   });
 });
 
