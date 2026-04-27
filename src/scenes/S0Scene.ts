@@ -32,6 +32,11 @@ declare global {
       selectedStatusRule: string | null;
       intentText: string | null;
       gameplayAssets: {
+        explorationBackground: null | {
+          id: string;
+          path: string;
+          approvalGate: string;
+        };
         combatBackground: null | {
           id: string;
           path: string;
@@ -58,6 +63,10 @@ const textStyle = THEME.textStyle;
 const layout = S0_LAYOUT;
 const SAVE_KEY = 'hollowmark:s0-save';
 const M1_COMBAT_SEED = 'm1-natural-19';
+const GAMEPLAY_EXPLORATION_BACKGROUND = {
+  id: 'underroot.corridor.placeholder',
+  key: 'gameplay-underroot-corridor-background',
+} as const;
 const GAMEPLAY_COMBAT_BACKGROUND = {
   id: 'underroot.combat.placeholder',
   key: 'gameplay-underroot-combat-background',
@@ -79,6 +88,11 @@ const COMPACT_CARD_NAMES: Record<string, string> = {
   'Sanctuary Veil': 'Sanct Veil',
 };
 type ExploreMotionCommand = Extract<ExploreCommand, { type: 'step-forward' | 'step-back' | 'turn-left' | 'turn-right' }>;
+type GameplayExplorationBackground = Readonly<{
+  id: string;
+  path: string;
+  approvalGate: string;
+}> | null;
 type GameplayCombatBackground = Readonly<{
   id: string;
   path: string;
@@ -97,6 +111,7 @@ export class S0Scene extends Phaser.Scene {
   private selectedCardId: CardInstanceId | null = null;
   private audioContext: AudioContext | null = null;
   private shell!: Phaser.GameObjects.Graphics;
+  private explorationBackgroundImage: Phaser.GameObjects.Image | null = null;
   private combatBackgroundImage: Phaser.GameObjects.Image | null = null;
   private viewport!: Phaser.GameObjects.Graphics;
   private tray!: Phaser.GameObjects.Graphics;
@@ -111,6 +126,7 @@ export class S0Scene extends Phaser.Scene {
   private hitStopTimeout: number | null = null;
   private exploreMotionTimer: Phaser.Time.TimerEvent | null = null;
   private queuedExploreMotion: ExploreMotionCommand | null = null;
+  private explorationBackground: GameplayExplorationBackground = null;
   private combatBackground: GameplayCombatBackground = null;
   private cardArt: readonly GameplayCardArt[] = [];
   private lastEvents: readonly GameEvent[] = [];
@@ -126,13 +142,17 @@ export class S0Scene extends Phaser.Scene {
   create() {
     this.state = initialStateForLocation(window.location);
     const manifest = this.cache.json.get(ASSET_MANIFEST_KEY);
+    this.explorationBackground = gameplayExplorationBackground(manifest);
     this.combatBackground = gameplayCombatBackground(manifest);
     this.cardArt = gameplayCardArt(manifest);
+    if (this.explorationBackground) {
+      this.load.image(GAMEPLAY_EXPLORATION_BACKGROUND.key, this.explorationBackground.path);
+    }
     if (this.combatBackground) {
       this.load.image(GAMEPLAY_COMBAT_BACKGROUND.key, this.combatBackground.path);
     }
     for (const art of this.cardArt) this.load.image(art.key, art.path);
-    if (this.combatBackground || this.cardArt.length > 0) {
+    if (this.explorationBackground || this.combatBackground || this.cardArt.length > 0) {
       this.load.once(Phaser.Loader.Events.COMPLETE, () => this.createScene());
       this.load.start();
       return;
@@ -176,6 +196,12 @@ export class S0Scene extends Phaser.Scene {
   private buildViews() {
     this.cameras.main.setBackgroundColor(colors.void);
     this.shell = this.add.graphics();
+    if (this.explorationBackground && this.textures.exists(GAMEPLAY_EXPLORATION_BACKGROUND.key)) {
+      this.explorationBackgroundImage = this.add.image(VIEWPORT.x + VIEWPORT.w / 2, VIEWPORT.y + VIEWPORT.h / 2, GAMEPLAY_EXPLORATION_BACKGROUND.key);
+      this.explorationBackgroundImage.setDisplaySize(VIEWPORT.w - S0_LAYOUT.viewport.innerPad * 2, VIEWPORT.h - S0_LAYOUT.viewport.innerPad * 2);
+      this.explorationBackgroundImage.setAlpha(0.76);
+      this.explorationBackgroundImage.setVisible(false);
+    }
     if (this.combatBackground && this.textures.exists(GAMEPLAY_COMBAT_BACKGROUND.key)) {
       this.combatBackgroundImage = this.add.image(VIEWPORT.x + VIEWPORT.w / 2, VIEWPORT.y + VIEWPORT.h / 2, GAMEPLAY_COMBAT_BACKGROUND.key);
       this.combatBackgroundImage.setDisplaySize(VIEWPORT.w - S0_LAYOUT.viewport.innerPad * 2, VIEWPORT.h - S0_LAYOUT.viewport.innerPad * 2);
@@ -290,6 +316,7 @@ export class S0Scene extends Phaser.Scene {
   }
 
   private drawViewport() {
+    this.explorationBackgroundImage?.setVisible(false);
     this.combatBackgroundImage?.setVisible(false);
     if (this.state.mode === 'town') {
       this.drawTownView();
@@ -309,13 +336,23 @@ export class S0Scene extends Phaser.Scene {
     const front = viewSlot(slots, 'front');
     const threat = current.threat === 'calm' && front.threat !== 'calm' ? front.threat : current.threat;
     const threatTint = threat === 'hunted' ? colors.red : threat === 'uneasy' ? colors.gold : colors.stoneLight;
-    g.fillStyle(colors.voidDeep, 1).fillRect(
-      VIEWPORT.x + viewport.innerPad,
-      VIEWPORT.y + viewport.innerPad,
-      VIEWPORT.w - viewport.innerPad * 2,
-      VIEWPORT.h - viewport.innerPad * 2,
-    );
-    g.fillStyle(colors.stone, 1).fillTriangle(
+    if (this.explorationBackgroundImage) {
+      this.explorationBackgroundImage.setVisible(true);
+      g.fillStyle(colors.void, 0.2).fillRect(
+        VIEWPORT.x + viewport.innerPad,
+        VIEWPORT.y + viewport.innerPad,
+        VIEWPORT.w - viewport.innerPad * 2,
+        VIEWPORT.h - viewport.innerPad * 2,
+      );
+    } else {
+      g.fillStyle(colors.voidDeep, 1).fillRect(
+        VIEWPORT.x + viewport.innerPad,
+        VIEWPORT.y + viewport.innerPad,
+        VIEWPORT.w - viewport.innerPad * 2,
+        VIEWPORT.h - viewport.innerPad * 2,
+      );
+    }
+    g.fillStyle(colors.stone, this.explorationBackgroundImage ? 0.3 : 1).fillTriangle(
       viewport.leftWall.x1,
       viewport.leftWall.y1,
       viewport.leftWall.x2,
@@ -323,7 +360,7 @@ export class S0Scene extends Phaser.Scene {
       viewport.leftWall.x3,
       viewport.leftWall.y3,
     );
-    g.fillStyle(colors.stoneLeft, 1).fillTriangle(
+    g.fillStyle(colors.stoneLeft, this.explorationBackgroundImage ? 0.24 : 1).fillTriangle(
       viewport.leftWing.x1,
       viewport.leftWing.y1,
       viewport.leftWing.x2,
@@ -331,7 +368,7 @@ export class S0Scene extends Phaser.Scene {
       viewport.leftWing.x3,
       viewport.leftWing.y3,
     );
-    g.fillStyle(colors.stoneRight, 1).fillTriangle(
+    g.fillStyle(colors.stoneRight, this.explorationBackgroundImage ? 0.24 : 1).fillTriangle(
       viewport.rightWing.x1,
       viewport.rightWing.y1,
       viewport.rightWing.x2,
@@ -880,6 +917,7 @@ export class S0Scene extends Phaser.Scene {
       selectedStatusRule: this.selectedStatusRule(),
       intentText: this.state.combat ? renderIntentText(this.state.combat.enemy.intent) : null,
       gameplayAssets: {
+        explorationBackground: this.explorationBackground,
         combatBackground: this.combatBackground,
         cardArt: this.cardArt.map(({ cardId, assetId, path, approvalGate }) => ({ cardId, assetId, path, approvalGate })),
         enemySprite: null,
@@ -969,6 +1007,20 @@ function isM2UnderrootRoute(location: Pick<Location, 'search'>): boolean {
 
 function isLabRoute(location: Pick<Location, 'search'>): boolean {
   return isM1CombatRoute(location) || isM2UnderrootRoute(location);
+}
+
+function gameplayExplorationBackground(manifest: unknown): GameplayExplorationBackground {
+  try {
+    const asset = assetFromManifest(manifest, GAMEPLAY_EXPLORATION_BACKGROUND.id);
+    if (asset.kind !== 'background' || asset.approvalGate !== 'approved-for-gameplay') return null;
+    return {
+      id: asset.id,
+      path: asset.previewPath,
+      approvalGate: asset.approvalGate,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function gameplayCombatBackground(manifest: unknown): GameplayCombatBackground {
