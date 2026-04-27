@@ -400,7 +400,7 @@ test('M2 browser smoke: lab run can seal the Underroot boss and show a town resu
   await expectDebugState(page, (state) => {
     expect(state.mode).toBe('town');
     expect(state.completedInteractions).toContain('underroot-boss-1');
-    expect(state.log.at(-1)).toBe('Marrowgate bells answer: the Underroot Alpha is sealed.');
+    expect(state.log.at(-1)).toBe('Marrowgate bells answer: Warm Shard carried the seal.');
     expect(state.lastEvents).toContainEqual({ type: 'MARROWGATE_RETURNED' });
   });
   expect(pageErrors).toEqual([]);
