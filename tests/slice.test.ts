@@ -368,7 +368,7 @@ describe('mode-safe slice reducer', () => {
     expect(result.state.townService).toBe('sanctuary');
     expect(result.state.townDebt).toBe(0);
     expect(result.state.completedInteractions).toEqual(['underroot-reward-1', 'underroot-shortcut-1']);
-    expect(result.state.log.at(-1)).toContain('Sanctuary');
+    expect(result.state.log.at(-1)).toBe('The Sanctuary settles D2. The next stair is quiet.');
   });
 
   it('selects placeholder Marrowgate services without changing dive progress', () => {

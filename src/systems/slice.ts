@@ -119,7 +119,7 @@ function applyTownCommand(state: SliceState, command: TownCommand): CommandResul
         ...state,
         townService: 'sanctuary',
         townDebt: 0,
-        log: [...state.log, 'The Sanctuary tallies the debt and lets the party breathe.'],
+        log: [...state.log, `The Sanctuary settles D${state.townDebt}. The next stair is quiet.`],
       },
       events: [{ type: 'INTERACT_NONE' }],
     };

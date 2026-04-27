@@ -476,6 +476,42 @@ test('M2 browser smoke: unsettled town debt wakes pressure on the next dive', as
   expect(pageErrors).toEqual([]);
 });
 
+test('M2 browser smoke: Sanctuary settlement keeps the next stair quiet', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m2-underroot');
+  await expect(page.locator('canvas')).toBeVisible();
+
+  await dispatchDebug(page, { type: 'enter-underroot' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'turn-right' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'interact' });
+  await dispatchDebug(page, { type: 'turn-left' });
+  await dispatchDebug(page, { type: 'turn-left' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'turn-right' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'interact' });
+  await dispatchDebug(page, { type: 'settle-debt' });
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('town');
+    expect(state.townDebt).toBe(0);
+    expect(state.log.at(-1)).toBe('The Sanctuary settles D1. The next stair is quiet.');
+  });
+
+  await dispatchDebug(page, { type: 'enter-underroot' });
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('explore');
+    expect(state.threatClock).toBe(0);
+    expect(state.log.at(-1)).toBe('The gate opens. Wet stone swallows the torchlight.');
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test('M2 browser smoke: hunting pressure sharpens the next bite', async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));
