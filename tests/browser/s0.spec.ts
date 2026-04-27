@@ -408,6 +408,36 @@ test('M2 browser smoke: lab run can seal the Underroot boss and show a town resu
   expect(pageErrors).toEqual([]);
 });
 
+test('M2 browser smoke: shortcut branch folds back to the main seam with debt', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m2-underroot');
+  await expect(page.locator('canvas')).toBeVisible();
+
+  await dispatchDebug(page, { type: 'enter-underroot' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'turn-right' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await expectDebugState(page, (state) => {
+    expect(state.position).toEqual({ x: 3, y: 3 });
+    expect(state.townDebt).toBe(0);
+  });
+
+  await dispatchDebug(page, { type: 'interact' });
+  await expectDebugState(page, (state) => {
+    expect(state.position).toEqual({ x: 1, y: 3 });
+    expect(state.townDebt).toBe(1);
+    expect(state.completedInteractions).toContain('underroot-shortcut-1');
+    expect(state.log.at(-1)).toBe('Roots take blood and fold you back to the main seam.');
+    expect(state.lastEvents).toContainEqual({ type: 'TILE_INTERACTION_COMPLETED', id: 'underroot-shortcut-1', interaction: 'shortcut' });
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test('M2 browser smoke: exploration keeps one buffered movement input', async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));

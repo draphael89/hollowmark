@@ -231,7 +231,7 @@ export const UNDERROOT_M2_FLOOR: FloorDef = {
         id: 'underroot-shortcut-1',
         to: { x: 1, y: 3 },
         debt: 1,
-        logLine: 'Roots take blood and fold you back.',
+        logLine: 'Roots take blood and fold you back to the main seam.',
       },
     },
     {

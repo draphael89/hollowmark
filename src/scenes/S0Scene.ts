@@ -1037,7 +1037,7 @@ function tileCue(prefix: 'Here' | 'Ahead', tile: FloorTile | null, state: SliceS
     return `${purposeIcon(purpose)} ${prefix}: ${claimed}`;
   }
   if (tile?.interaction?.type === 'shortcut') {
-    const claimed = state.completedInteractions.includes(tile.interaction.id) ? 'opened' : `shortcut +D${tile.interaction.debt}`;
+    const claimed = state.completedInteractions.includes(tile.interaction.id) ? 'opened' : `shortcut back +D${tile.interaction.debt}`;
     return `${purposeIcon(purpose)} ${prefix}: ${claimed}`;
   }
   if (tile?.interaction?.type === 'return-town') return `${purposeIcon(purpose)} ${prefix}: return`;
