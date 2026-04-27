@@ -59,7 +59,7 @@ export class VisualGalleryScene extends Phaser.Scene {
       this.label(`${index + 1}`, x + 12, y + 12, text.gold);
       this.label(asset.title, x + 72, y + 14, text.bone);
       this.label(compactAssetId(asset.id), x + 72, y + 32, text.mutedBone);
-      this.label(`${asset.kind} / ${asset.status}`, x + 72, y + 46, text.cyan);
+      this.label(`${asset.kind} / ${asset.approvalGate}`, x + 72, y + 46, gateColor(asset.approvalGate));
     });
 
     this.detailTitle = this.add.text(42, 276, '', { ...textStyle, color: text.gold });
@@ -145,6 +145,7 @@ export class VisualGalleryScene extends Phaser.Scene {
     this.detailBody.setText([
       asset.id,
       `${asset.kind} / ${asset.status}`,
+      `Gate: ${asset.approvalGate}`,
       `Review: ${asset.reviewFocus}`,
     ]);
   }
@@ -167,7 +168,9 @@ export class VisualGalleryScene extends Phaser.Scene {
         selectedId: asset.id,
         selectedKind: asset.kind,
         selectedStatus: asset.status,
+        selectedApprovalGate: asset.approvalGate,
         selectedReviewFocus: asset.reviewFocus,
+        gameplayReadyAssetIds: this.assets.filter((entry) => entry.approvalGate === 'approved-for-gameplay').map((entry) => entry.id),
         stableIds: this.assets.map((entry) => entry.id),
       },
     });
@@ -186,6 +189,12 @@ function selectedPreviewSize(kind: AssetManifestEntry['kind']): [number, number]
   if (kind === 'sprite') return [44, 58];
   if (kind === 'card-art') return [78, 58];
   return [58, 58];
+}
+
+function gateColor(gate: AssetManifestEntry['approvalGate']): string {
+  if (gate === 'approved-for-gameplay') return text.gold;
+  if (gate === 'blocked') return text.red;
+  return text.cyan;
 }
 
 function compactAssetId(id: string): string {

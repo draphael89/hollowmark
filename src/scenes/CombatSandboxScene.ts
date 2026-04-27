@@ -19,10 +19,12 @@ const COMBAT_PREVIEW = {
   backgroundId: 'underroot.combat.placeholder',
   backgroundKey: 'underroot-combat-preview',
   backgroundPath: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
+  backgroundApprovalState: 'approved',
   enemyId: 'enemy.root-wolf.placeholder',
   enemyKey: 'rootbitten-wolf-matte-preview',
   enemyPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png',
-  approvalState: 'in_game_previewed',
+  enemyApprovalState: 'in_game_previewed',
+  compositionGate: 'needs-review',
 } as const;
 const HAND_SLOT_HITBOXES = [
   { x: 78, y: 114, w: 58, h: 18 },
@@ -255,9 +257,11 @@ export class CombatSandboxScene extends Phaser.Scene {
         assetPreview: {
           backgroundId: COMBAT_PREVIEW.backgroundId,
           backgroundPath: COMBAT_PREVIEW.backgroundPath,
+          backgroundApprovalState: COMBAT_PREVIEW.backgroundApprovalState,
           enemyId: COMBAT_PREVIEW.enemyId,
           enemyPath: COMBAT_PREVIEW.enemyPath,
-          approvalState: COMBAT_PREVIEW.approvalState,
+          enemyApprovalState: COMBAT_PREVIEW.enemyApprovalState,
+          compositionGate: COMBAT_PREVIEW.compositionGate,
         },
       },
     });

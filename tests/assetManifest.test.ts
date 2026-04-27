@@ -20,7 +20,7 @@ describe('asset manifest', () => {
   it('derives gallery entries from public passports', () => {
     const expectedStates = new Map([
       ['underroot.corridor.placeholder', 'in_game_previewed'],
-      ['underroot.combat.placeholder', 'in_game_previewed'],
+      ['underroot.combat.placeholder', 'approved'],
       ['enemy.root-wolf.placeholder', 'in_game_previewed'],
       ['card.blood-edge.placeholder', 'in_game_previewed'],
       ['ui.ornaments.placeholder', 'rejected'],
@@ -32,8 +32,16 @@ describe('asset manifest', () => {
       expect(asset.title.length).toBeGreaterThan(0);
       expect(asset.reviewFocus.length).toBeGreaterThan(0);
       expect(asset.previewPath).toMatch(/^\/assets\/drafts\/underroot\/batch-01\/.+\.png$/);
-      expect(Object.keys(asset).sort()).toEqual(['id', 'kind', 'previewPath', 'reviewFocus', 'status', 'title']);
+      expect(Object.keys(asset).sort()).toEqual(['approvalGate', 'id', 'kind', 'previewPath', 'reviewFocus', 'status', 'title']);
     }
+  });
+
+  it('separates approved, review, and blocked assets for gameplay gating', () => {
+    const gates = new Map(readGalleryAssets().map((asset) => [asset.id, asset.approvalGate]));
+
+    expect(gates.get('underroot.combat.placeholder')).toBe('approved-for-gameplay');
+    expect(gates.get('ui.ornaments.placeholder')).toBe('blocked');
+    expect(gates.get('enemy.root-wolf.placeholder')).toBe('needs-review');
   });
 });
 
