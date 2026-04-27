@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ASSET_MANIFEST_KEY, ASSET_MANIFEST_URL, assetFromManifest } from '../assets/manifest';
 import { M1_STARTER_CARDS } from '../data/combat';
 import { planFeelCues, type FeelCue } from '../fx/feelScheduler';
 import { GAME_HEIGHT, GAME_WIDTH } from '../game/layout';
@@ -18,12 +19,8 @@ const SANDBOX_ENEMY_X = 304;
 const COMBAT_PREVIEW = {
   backgroundId: 'underroot.combat.placeholder',
   backgroundKey: 'underroot-combat-preview',
-  backgroundPath: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
-  backgroundApprovalState: 'approved',
   enemyId: 'enemy.root-wolf.placeholder',
   enemyKey: 'rootbitten-wolf-matte-preview',
-  enemyPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-clean-preview-01.png',
-  enemyApprovalState: 'in_game_previewed',
   compositionGate: 'needs-review',
 } as const;
 const HAND_SLOT_HITBOXES = [
@@ -63,17 +60,25 @@ export class CombatSandboxScene extends Phaser.Scene {
   private readonly cueTimers: Phaser.Time.TimerEvent[] = [];
   private hitStopUntil = 0;
   private hitStopTimeout: number | null = null;
+  private assetPreview!: CombatAssetPreview;
 
   constructor() {
     super('CombatSandboxScene');
   }
 
   preload(): void {
-    this.load.image(COMBAT_PREVIEW.backgroundKey, COMBAT_PREVIEW.backgroundPath);
-    this.load.image(COMBAT_PREVIEW.enemyKey, COMBAT_PREVIEW.enemyPath);
+    this.load.json(ASSET_MANIFEST_KEY, ASSET_MANIFEST_URL);
   }
 
   create(): void {
+    this.assetPreview = combatAssetPreview(this.cache.json.get(ASSET_MANIFEST_KEY));
+    this.load.image(COMBAT_PREVIEW.backgroundKey, this.assetPreview.backgroundPath);
+    this.load.image(COMBAT_PREVIEW.enemyKey, this.assetPreview.enemyPath);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => this.createSandbox());
+    this.load.start();
+  }
+
+  private createSandbox(): void {
     this.fx = this.add.group();
     this.drawShell();
     cues.forEach((cue) => {
@@ -256,11 +261,11 @@ export class CombatSandboxScene extends Phaser.Scene {
         selectedCard: selectedCardDebug(this.labCombat, this.selectedSlot),
         assetPreview: {
           backgroundId: COMBAT_PREVIEW.backgroundId,
-          backgroundPath: COMBAT_PREVIEW.backgroundPath,
-          backgroundApprovalState: COMBAT_PREVIEW.backgroundApprovalState,
+          backgroundPath: this.assetPreview.backgroundPath,
+          backgroundApprovalState: this.assetPreview.backgroundApprovalState,
           enemyId: COMBAT_PREVIEW.enemyId,
-          enemyPath: COMBAT_PREVIEW.enemyPath,
-          enemyApprovalState: COMBAT_PREVIEW.enemyApprovalState,
+          enemyPath: this.assetPreview.enemyPath,
+          enemyApprovalState: this.assetPreview.enemyApprovalState,
           compositionGate: COMBAT_PREVIEW.compositionGate,
         },
       },
@@ -375,6 +380,24 @@ type DeckPreview = Readonly<{
   hand: readonly CardId[];
   drawPile: readonly CardId[];
 }>;
+
+type CombatAssetPreview = Readonly<{
+  backgroundPath: string;
+  backgroundApprovalState: string;
+  enemyPath: string;
+  enemyApprovalState: string;
+}>;
+
+function combatAssetPreview(manifest: unknown): CombatAssetPreview {
+  const background = assetFromManifest(manifest, COMBAT_PREVIEW.backgroundId);
+  const enemy = assetFromManifest(manifest, COMBAT_PREVIEW.enemyId);
+  return {
+    backgroundPath: background.previewPath,
+    backgroundApprovalState: background.status,
+    enemyPath: enemy.previewPath,
+    enemyApprovalState: enemy.status,
+  };
+}
 
 function m1DeckPreview(combat: CombatState): DeckPreview {
   return {

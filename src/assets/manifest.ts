@@ -45,6 +45,12 @@ export function galleryAssetsFromManifest(value: unknown): readonly AssetManifes
   }));
 }
 
+export function assetFromManifest(value: unknown, id: string): AssetManifestEntry {
+  const asset = galleryAssetsFromManifest(value).find((entry) => entry.id === id);
+  if (!asset) throw new Error(`Missing asset passport: ${id}`);
+  return asset;
+}
+
 function approvalGateFor(status: AssetStatus): AssetApprovalGate {
   if (status === 'approved' || status === 'manifested') return 'approved-for-gameplay';
   if (status === 'rejected') return 'blocked';
