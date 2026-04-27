@@ -1,0 +1,30 @@
+Create one enemy sprite source for a first-person party dungeon crawler.
+
+Subject: Rootbitten Wolf, a gaunt wolf-shaped dungeon beast grown through with
+wet roots, exposed red-black bark sinew, and old bone ridges. It should feel
+hungry, cursed, and grounded, not cute or heroic.
+
+Pose: grounded combat idle, full body visible, three-quarter front view,
+readable silhouette, feet/contact point visible, head and shoulders dominant.
+Keep all limbs connected to the main body shape; avoid dangling twig clusters
+that separate into tiny islands at sprite scale.
+
+Lighting: warm torch from front-left, cold blue rim from upper-right, dark
+contact shadow below.
+
+Style: moonlit oxblood dungeon manuscript; painterly pixel-art source for a
+16-bit-inspired first-person dungeon RPG; high-contrast silhouette; deep indigo
+shadows; bone-colored highlights; muted oxblood accents; damp low-fantasy
+horror; limited-palette feeling; no clean modern UI; no text.
+
+Background: flat dark desaturated blue-gray matte, visibly different from the
+wolf's black body shadows, easy to remove. Do not use pure black behind the
+body. Do not blend the rear legs into the background.
+
+Use: source image will be background-removed, outlined only if needed,
+palette-quantized, and downsampled to 96x128. It must read against both a
+checkerboard alpha review and the approved Underroot combat background.
+
+Avoid: multiple creatures, cropped limbs, separated twig hairs, thin transparent
+leg gaps, cute cartoon, anime style, bright saturated colors, photorealistic
+fur, modern objects, readable letters, symbols, logos, UI, or text.
