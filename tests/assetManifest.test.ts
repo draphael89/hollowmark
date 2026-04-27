@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { galleryAssetsFromManifest } from '../src/assets/manifest';
+import { assetFromManifest, galleryAssetsFromManifest } from '../src/assets/manifest';
 
 describe('asset manifest', () => {
   it('keeps asset ids stable and unique for gallery review', () => {
@@ -43,8 +43,24 @@ describe('asset manifest', () => {
     expect(gates.get('ui.ornaments.placeholder')).toBe('blocked');
     expect(gates.get('enemy.root-wolf.placeholder')).toBe('needs-review');
   });
+
+  it('looks up review assets by stable id', () => {
+    const manifest = readManifest();
+
+    expect(assetFromManifest(manifest, 'underroot.combat.placeholder')).toEqual(expect.objectContaining({
+      id: 'underroot.combat.placeholder',
+      status: 'approved',
+      approvalGate: 'approved-for-gameplay',
+      previewPath: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
+    }));
+    expect(() => assetFromManifest(manifest, 'missing.asset')).toThrow('Missing asset passport: missing.asset');
+  });
 });
 
 function readGalleryAssets() {
-  return galleryAssetsFromManifest(JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')));
+  return galleryAssetsFromManifest(readManifest());
+}
+
+function readManifest() {
+  return JSON.parse(readFileSync('public/assets/manifest.json', 'utf8'));
 }
