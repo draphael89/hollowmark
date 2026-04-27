@@ -12,6 +12,8 @@ type AssetPassport = {
   processedPath: string | null;
   finalSize: { w: number; h: number };
   matteOrMaskNotes: string;
+  humanEditNotes: string;
+  inGamePreview: string;
   approvalState: string;
   rejectionNotes: string | null;
 };
@@ -33,7 +35,7 @@ describe('asset production foundation', () => {
     const manifest = readAssetManifest();
 
     for (const asset of manifest.assets) {
-      expect(['in_game_previewed', 'rejected']).toContain(asset.approvalState);
+      expect(['in_game_previewed', 'approved', 'rejected']).toContain(asset.approvalState);
       expect(asset.title.length).toBeGreaterThan(0);
       expect(asset.reviewFocus.length).toBeGreaterThan(0);
       expect(asset.rawSource).toMatch(new RegExp('^\\.curation/raw/underroot/batch-01/.+\\.png$'));
@@ -53,6 +55,15 @@ describe('asset production foundation', () => {
 
     expect(rejected.map((asset) => asset.id)).toEqual(['ui.ornaments.placeholder']);
     expect(rejected[0]?.rejectionNotes).toContain('Rejected for approval');
+  });
+
+  it('approves only the combat background from the first composition pass', () => {
+    const manifest = readAssetManifest();
+    const approved = manifest.assets.filter((asset) => asset.approvalState === 'approved');
+
+    expect(approved.map((asset) => asset.id)).toEqual(['underroot.combat.placeholder']);
+    expect(approved[0]?.humanEditNotes).toContain('Combat Sandbox composition review');
+    expect(approved[0]?.inGamePreview).toBe('?scene=combat-sandbox');
   });
 
   it('tracks the wolf matte preview separately from the raw draft', () => {

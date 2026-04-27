@@ -40,9 +40,9 @@
       "palette": "draft-generated",
       "cropNotes": "Center-cropped and downsampled to 392x220. Good enemy stage and floor contact read.",
       "matteOrMaskNotes": "Not applicable for full plate.",
-      "humanEditNotes": "Batch 01 draft previewed in Visual Gallery. Strongest first background candidate; ready for approval review after final no-text pass.",
-      "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "in_game_previewed",
+      "humanEditNotes": "Approved after Visual Gallery and Combat Sandbox composition review. Eligible for future gameplay wiring through the manifest; do not reference the raw file path from gameplay data.",
+      "inGamePreview": "?scene=combat-sandbox",
+      "approvalState": "approved",
       "rejectionNotes": null
     },
     {

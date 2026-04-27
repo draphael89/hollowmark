@@ -3,11 +3,13 @@ export const ASSET_MANIFEST_URL = '/assets/manifest.json';
 
 export type AssetKind = 'background' | 'sprite' | 'card-art' | 'ui';
 export type AssetStatus = 'placeholder' | 'raw_generated' | 'candidate' | 'processed' | 'in_game_previewed' | 'approved' | 'rejected' | 'manifested';
+export type AssetApprovalGate = 'approved-for-gameplay' | 'needs-review' | 'blocked';
 
 export type AssetManifestEntry = Readonly<{
   id: string;
   kind: AssetKind;
   status: AssetStatus;
+  approvalGate: AssetApprovalGate;
   title: string;
   reviewFocus: string;
   previewPath: string;
@@ -36,10 +38,17 @@ export function galleryAssetsFromManifest(value: unknown): readonly AssetManifes
     id: asset.id,
     kind: asset.kind,
     status: asset.approvalState,
+    approvalGate: approvalGateFor(asset.approvalState),
     title: asset.title,
     reviewFocus: asset.reviewFocus,
     previewPath: previewPathFor(asset),
   }));
+}
+
+function approvalGateFor(status: AssetStatus): AssetApprovalGate {
+  if (status === 'approved' || status === 'manifested') return 'approved-for-gameplay';
+  if (status === 'rejected') return 'blocked';
+  return 'needs-review';
 }
 
 function previewPathFor(asset: AssetPassport): string {

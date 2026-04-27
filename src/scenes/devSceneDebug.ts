@@ -21,9 +21,11 @@ export type CombatSandboxDebug = {
   assetPreview: {
     backgroundId: string;
     backgroundPath: string;
+    backgroundApprovalState: string;
     enemyId: string;
     enemyPath: string;
-    approvalState: string;
+    enemyApprovalState: string;
+    compositionGate: string;
   };
   selectedCard: null | {
     slot: string;
@@ -59,7 +61,9 @@ export type DevSceneDebug = {
     selectedId: string;
     selectedKind: string;
     selectedStatus: string;
+    selectedApprovalGate: string;
     selectedReviewFocus: string;
+    gameplayReadyAssetIds: readonly string[];
     stableIds: readonly string[];
   };
   scenarioLab?: {

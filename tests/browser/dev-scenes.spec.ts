@@ -54,9 +54,11 @@ test('combat sandbox previews cues without rebuilding the shell', async ({ page 
   expect(sandbox?.assetPreview).toEqual({
     backgroundId: 'underroot.combat.placeholder',
     backgroundPath: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
+    backgroundApprovalState: 'approved',
     enemyId: 'enemy.root-wolf.placeholder',
     enemyPath: '/assets/drafts/underroot/batch-01/rootbitten-wolf-matte-preview-01.png',
-    approvalState: 'in_game_previewed',
+    enemyApprovalState: 'in_game_previewed',
+    compositionGate: 'needs-review',
   });
   expect(new Set(sandbox?.hand).size).toBe(sandbox?.hand.length);
   expect(sandbox?.selectedCard).toEqual(expect.objectContaining({
@@ -229,8 +231,10 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
     selectedId: 'underroot.corridor.placeholder',
     selectedKind: 'background',
     selectedStatus: 'in_game_previewed',
+    selectedApprovalGate: 'needs-review',
     selectedReviewFocus: 'depth, tile read, no text',
   }));
+  expect(debug.visualGallery?.gameplayReadyAssetIds).toEqual(['underroot.combat.placeholder']);
   expect(debug.visualGallery?.stableIds).toEqual([
     'underroot.corridor.placeholder',
     'underroot.combat.placeholder',
@@ -245,7 +249,17 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
   expect(debug.visualGallery).toEqual(expect.objectContaining({
     selectedId: 'card.blood-edge.placeholder',
     selectedKind: 'card-art',
+    selectedApprovalGate: 'needs-review',
     selectedReviewFocus: 'temptation, danger, crop safety',
+  }));
+
+  await page.keyboard.press('Digit2');
+  await expect.poll(async () => (await getDevDebug(page)).label).toBe('underroot.combat.placeholder');
+  debug = await getDevDebug(page);
+  expect(debug.visualGallery).toEqual(expect.objectContaining({
+    selectedId: 'underroot.combat.placeholder',
+    selectedStatus: 'approved',
+    selectedApprovalGate: 'approved-for-gameplay',
   }));
 
   await page.keyboard.press('Digit5');
