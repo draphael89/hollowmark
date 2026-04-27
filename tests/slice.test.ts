@@ -230,6 +230,42 @@ describe('mode-safe slice reducer', () => {
     expect(s0.state.combat?.hand.map((cardId) => cardDefFor(s0.state.combat!, cardId).id)).toEqual(S0_CARDS.map((card) => card.id));
   });
 
+  it('gives elite and boss Underroot encounters distinct stakes', () => {
+    const elite = applyCommand(
+      {
+        ...createTownState('m2-underroot'),
+        mode: 'explore' as const,
+        position: { x: 4, y: 2 },
+        threat: 'hunted' as const,
+      },
+      { type: 'interact' },
+    );
+    const boss = applyCommand(
+      {
+        ...createTownState('m2-underroot'),
+        mode: 'explore' as const,
+        position: { x: 1, y: 1 },
+        threat: 'hunted' as const,
+      },
+      { type: 'interact' },
+    );
+
+    expect(elite.state.combat?.enemy).toMatchObject({
+      id: 'root-knotted-brute',
+      name: 'Root-Knotted Brute',
+      hp: 32,
+      maxHp: 32,
+      intent: { type: 'attack', target: 'mia', amount: 8 },
+    });
+    expect(boss.state.combat?.enemy).toMatchObject({
+      id: 'underroot-alpha',
+      name: 'Underroot Alpha',
+      hp: 42,
+      maxHp: 42,
+      intent: { type: 'attack', target: 'liese', amount: 10 },
+    });
+  });
+
   it('spends Underroot safety on each committed step', () => {
     let state = applyCommand(createTownState('m2-underroot'), { type: 'enter-underroot' }).state;
     expect(state.threatClock).toBe(0);
