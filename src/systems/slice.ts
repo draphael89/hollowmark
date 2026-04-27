@@ -249,7 +249,10 @@ function resolveInteraction(state: SliceState, interaction: TileInteraction): Co
   }
 
   if (interaction.type === 'rest') {
-    return completeInteraction(state, interaction, { logLine: interaction.logLine });
+    return completeInteraction(state, interaction, {
+      threatClock: 0,
+      logLine: interaction.logLine,
+    });
   }
 
   if (interaction.type === 'reward') {
@@ -362,7 +365,7 @@ function countCompleted(state: SliceState, prefix: string): number {
 function completeInteraction(
   state: SliceState,
   interaction: Exclude<TileInteraction, { type: 'combat' }>,
-  patch: Partial<Pick<SliceState, 'mode' | 'position' | 'threat' | 'townDebt'>> & { logLine: string },
+  patch: Partial<Pick<SliceState, 'mode' | 'position' | 'threat' | 'threatClock' | 'townDebt'>> & { logLine: string },
 ): CommandResult {
   const { logLine, ...statePatch } = patch;
   return {

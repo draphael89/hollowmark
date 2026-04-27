@@ -27,7 +27,7 @@ describe('versioned saves', () => {
     expect(result).toEqual({ ok: true, state: returned });
     expect(result.ok && result.state.mode).toBe('town');
     expect(result.ok && result.state.townDebt).toBe(0);
-    expect(result.ok && result.state.threatClock).toBe(1);
+    expect(result.ok && result.state.threatClock).toBe(0);
     expect(result.ok && result.state.completedInteractions).toContain('underroot-rest-1');
     expect(result.ok && result.state.completedInteractions).toContain('underroot-return-1');
   });
