@@ -1007,9 +1007,16 @@ function underrootProgressLine(state: SliceState): string {
 }
 
 function marrowgateRunLine(state: SliceState): string {
-  if (state.completedInteractions.includes('underroot-boss-1')) return `Run sealed  ${claimedSpoilsLine(state) || 'No spoils'}  D${state.townDebt}`;
+  if (state.completedInteractions.includes('underroot-boss-1')) return `Run sealed  ${runSpoilLine(state)}  D${state.townDebt}`;
   if (state.completedInteractions.length > 0) return `Run open  ${underrootProgressLine(state)}`;
   return 'Run open  Enter the Underroot';
+}
+
+function runSpoilLine(state: SliceState): string {
+  const spoils = claimedSpoilNames(state);
+  if (spoils.length === 0) return 'No spoils';
+  if (spoils.length === 1) return `Carried by ${spoils[0]}`;
+  return `Carried by ${spoils.length} spoils`;
 }
 
 function encounterPreview(current: FloorTile | null, front: FloorTile | null): { name: string; intent: string } {
@@ -1053,12 +1060,16 @@ function canOpenBossCue(state: SliceState): boolean {
 }
 
 function claimedSpoilsLine(state: SliceState): string {
+  const spoils = claimedSpoilNames(state);
+  return spoils.length > 0 ? `Spoils ${spoils.join(' / ')}` : '';
+}
+
+function claimedSpoilNames(state: SliceState): string[] {
   const floor = floorForId(state.floorId);
-  const spoils = floor.tiles.flatMap((tile) => {
+  return floor.tiles.flatMap((tile) => {
     if (tile.interaction?.type !== 'reward') return [];
     return state.completedInteractions.includes(tile.interaction.id) ? [tile.interaction.spoil] : [];
   });
-  return spoils.length > 0 ? `Spoils ${spoils.join(' / ')}` : '';
 }
 
 function countCompleted(state: SliceState, prefix: string): number {

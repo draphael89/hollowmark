@@ -466,8 +466,22 @@ function resolveCombatVictory(state: SliceState, combat: NonNullable<SliceState[
 }
 
 function townReturnLine(state: SliceState): string {
-  if (state.activeInteractionId === 'underroot-boss-1') return 'Marrowgate bells answer: the Underroot Alpha is sealed.';
+  if (state.activeInteractionId === 'underroot-boss-1') return bossReturnLine(state);
   return 'Marrowgate takes the party back in.';
+}
+
+function bossReturnLine(state: SliceState): string {
+  const spoils = completedSpoils(state);
+  if (spoils.length === 0) return 'Marrowgate bells answer: the Underroot Alpha is sealed.';
+  return `Marrowgate bells answer: ${spoils.join(' / ')} carried the seal.`;
+}
+
+function completedSpoils(state: SliceState): string[] {
+  const spoils: string[] = [];
+  if (state.completedInteractions.includes('underroot-reward-1')) spoils.push('Warm Shard');
+  if (state.completedInteractions.includes('underroot-reward-2')) spoils.push('Bone Charm');
+  if (state.completedInteractions.includes('underroot-reward-3')) spoils.push('Silver Nest');
+  return spoils;
 }
 
 function withCombat(state: SliceState, combat: NonNullable<SliceState['combat']>): SliceState {

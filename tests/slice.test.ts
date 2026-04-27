@@ -341,7 +341,7 @@ describe('mode-safe slice reducer', () => {
     expect(result.state.mode).toBe('town');
     expect(result.state.combat).toBeNull();
     expect(result.state.completedInteractions).toContain('underroot-boss-1');
-    expect(result.state.log.at(-1)).toBe('Marrowgate bells answer: the Underroot Alpha is sealed.');
+    expect(result.state.log.at(-1)).toBe('Marrowgate bells answer: Warm Shard carried the seal.');
     expect(result.events).toContainEqual({ type: 'MARROWGATE_RETURNED' });
   });
 
