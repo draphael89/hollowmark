@@ -5,7 +5,7 @@ import { getInitialFeelSettings, planFeelCues, type FeelCue, type FeelSettings, 
 import { GAME_HEIGHT, GAME_WIDTH, S0_LAYOUT, SIDE_PANEL, TRAY, VIEWPORT } from '../game/layout';
 import { MOTION } from '../game/motion';
 import { THEME } from '../game/theme';
-import type { CardDef, CardInstanceId, CombatState, ExploreCommand, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId, TilePurpose, TownCommand } from '../game/types';
+import type { CardDef, CardInstanceId, CombatState, ExploreCommand, FloorTile, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId, TilePurpose, TownCommand } from '../game/types';
 import { M1_STARTER_CARDS } from '../data/combat';
 import { cardDefFor, createCombatWithCards, renderIntentText } from '../systems/combat';
 import { floorForId } from '../data/floors';
@@ -435,17 +435,19 @@ export class S0Scene extends Phaser.Scene {
 
     this.label(`Facing ${this.state.facing.toUpperCase()}  ${current.coord.x},${current.coord.y}`, viewport.facingLabel.x, viewport.facingLabel.y);
     if (this.state.floorId === 'underroot-m2-placeholder') {
-      this.drawTilePurposeCue(current.tile?.purpose ?? 'side-path', front.tile?.purpose ?? 'side-path');
+      this.drawTilePurposeCue(this.state, current.tile, front.tile);
     }
   }
 
-  private drawTilePurposeCue(current: TilePurpose, front: TilePurpose): void {
+  private drawTilePurposeCue(state: SliceState, current: FloorTile | null, front: FloorTile | null): void {
+    const currentPurpose = current?.purpose ?? 'side-path';
+    const frontPurpose = front?.purpose ?? 'side-path';
     const g = this.viewport;
-    const color = purposeColor(current);
+    const color = purposeColor(currentPurpose);
     g.fillStyle(colors.void, 0.68).fillRect(28, 184, 342, 28);
     g.lineStyle(1, color, 1).strokeRect(28, 184, 342, 28);
-    this.label(`${purposeIcon(current)} Here: ${purposeLabel(current)}`, 38, 191, purposeText(current));
-    this.label(`${purposeIcon(front)} Ahead: ${purposeLabel(front)}`, 200, 191, purposeText(front));
+    this.label(tileCue('Here', current, state), 38, 191, purposeText(currentPurpose));
+    this.label(tileCue('Ahead', front, state), 200, 191, purposeText(frontPurpose));
   }
 
   private drawTownView() {
@@ -556,7 +558,8 @@ export class S0Scene extends Phaser.Scene {
     if (this.state.mode !== 'combat' && this.state.mode !== 'victory' && this.state.mode !== 'defeat') {
       this.label(this.state.log.slice(-2).join('\n'), tray.log.x, tray.log.y);
       if (this.state.floorId === 'underroot-m2-placeholder') {
-        this.label(underrootProgressLine(this.state), tray.exploreHint.x, tray.exploreHint.y - 12, text.gold);
+        const spoils = claimedSpoilsLine(this.state);
+        this.label(spoils || underrootProgressLine(this.state), tray.exploreHint.x, tray.exploreHint.y - 12, spoils ? text.cyan : text.gold);
       }
       this.label('W/S step   A/D turn   Space interact', tray.exploreHint.x, tray.exploreHint.y, text.mutedBone);
       return;
@@ -997,6 +1000,34 @@ function underrootProgressLine(state: SliceState): string {
   const rest = state.completedInteractions.includes('underroot-rest-1') ? 'rest used' : 'rest open';
   const boss = state.completedInteractions.includes('underroot-boss-1') ? 'boss sealed' : 'boss';
   return `Dive R${rewards}/3 F${fights}/6  ${rest}  ${boss}  D${state.townDebt}`;
+}
+
+function tileCue(prefix: 'Here' | 'Ahead', tile: FloorTile | null, state: SliceState): string {
+  const purpose = tile?.purpose ?? 'side-path';
+  if (tile?.interaction?.type === 'reward') {
+    const claimed = state.completedInteractions.includes(tile.interaction.id) ? 'claimed' : `claim ${tile.interaction.spoil} +D${tile.interaction.debt}`;
+    return `${purposeIcon(purpose)} ${prefix}: ${claimed}`;
+  }
+  if (tile?.interaction?.type === 'rest') {
+    const claimed = state.completedInteractions.includes(tile.interaction.id) ? 'used' : 'rest';
+    return `${purposeIcon(purpose)} ${prefix}: ${claimed}`;
+  }
+  if (tile?.interaction?.type === 'shortcut') {
+    const claimed = state.completedInteractions.includes(tile.interaction.id) ? 'opened' : `shortcut +D${tile.interaction.debt}`;
+    return `${purposeIcon(purpose)} ${prefix}: ${claimed}`;
+  }
+  if (tile?.interaction?.type === 'return-town') return `${purposeIcon(purpose)} ${prefix}: return`;
+  if (tile?.interaction?.type === 'combat') return `${purposeIcon(purpose)} ${prefix}: fight`;
+  return `${purposeIcon(purpose)} ${prefix}: ${purposeLabel(purpose)}`;
+}
+
+function claimedSpoilsLine(state: SliceState): string {
+  const floor = floorForId(state.floorId);
+  const spoils = floor.tiles.flatMap((tile) => {
+    if (tile.interaction?.type !== 'reward') return [];
+    return state.completedInteractions.includes(tile.interaction.id) ? [tile.interaction.spoil] : [];
+  });
+  return spoils.length > 0 ? `Spoils ${spoils.join(' / ')}` : '';
 }
 
 function countCompleted(state: SliceState, prefix: string): number {

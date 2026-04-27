@@ -367,7 +367,7 @@ test('M2 browser smoke: exploration keeps one buffered movement input', async ({
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
 
-  await page.keyboard.press('Space');
+  await dispatchDebug(page, { type: 'enter-underroot' });
   await expect.poll(async () => (await getDebugState(page)).mode).toBe('explore');
 
   await page.keyboard.press('KeyW');
