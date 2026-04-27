@@ -59,7 +59,7 @@ export class VisualGalleryScene extends Phaser.Scene {
       this.label(`${index + 1}`, x + 12, y + 12, text.gold);
       this.label(asset.title, x + 72, y + 14, text.bone);
       this.label(compactAssetId(asset.id), x + 72, y + 32, text.mutedBone);
-      this.label(`${asset.kind} / ${asset.approvalGate}`, x + 72, y + 46, gateColor(asset.approvalGate));
+      this.label(`${asset.kind} / ${compactGate(asset.approvalGate)}`, x + 72, y + 46, gateColor(asset.approvalGate));
     });
 
     this.detailTitle = this.add.text(42, 276, '', { ...textStyle, color: text.gold });
@@ -195,6 +195,12 @@ function gateColor(gate: AssetManifestEntry['approvalGate']): string {
   if (gate === 'approved-for-gameplay') return text.gold;
   if (gate === 'blocked') return text.red;
   return text.cyan;
+}
+
+function compactGate(gate: AssetManifestEntry['approvalGate']): string {
+  if (gate === 'approved-for-gameplay') return 'ready';
+  if (gate === 'needs-review') return 'review';
+  return 'blocked';
 }
 
 function compactAssetId(id: string): string {
