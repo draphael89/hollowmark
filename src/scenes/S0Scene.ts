@@ -37,6 +37,12 @@ declare global {
           path: string;
           approvalGate: string;
         };
+        cardArt: readonly {
+          cardId: string;
+          assetId: string;
+          path: string;
+          approvalGate: string;
+        }[];
         enemySprite: null;
       };
       feelSettings: FeelSettings;
@@ -56,6 +62,12 @@ const GAMEPLAY_COMBAT_BACKGROUND = {
   id: 'underroot.combat.placeholder',
   key: 'gameplay-underroot-combat-background',
 } as const;
+const GAMEPLAY_CARD_ART = {
+  'blood-edge': {
+    id: 'card.blood-edge.placeholder',
+    key: 'gameplay-card-blood-edge',
+  },
+} as const;
 const COMPACT_CARD_NAMES: Record<string, string> = {
   'Ringing Blow': 'Ring Blow',
   'Shadow Mark': 'Shado Mark',
@@ -72,6 +84,13 @@ type GameplayCombatBackground = Readonly<{
   path: string;
   approvalGate: string;
 }> | null;
+type GameplayCardArt = Readonly<{
+  cardId: keyof typeof GAMEPLAY_CARD_ART;
+  assetId: string;
+  key: string;
+  path: string;
+  approvalGate: string;
+}>;
 
 export class S0Scene extends Phaser.Scene {
   private state = createSliceState();
@@ -93,6 +112,7 @@ export class S0Scene extends Phaser.Scene {
   private exploreMotionTimer: Phaser.Time.TimerEvent | null = null;
   private queuedExploreMotion: ExploreMotionCommand | null = null;
   private combatBackground: GameplayCombatBackground = null;
+  private cardArt: readonly GameplayCardArt[] = [];
   private lastEvents: readonly GameEvent[] = [];
 
   constructor() {
@@ -105,9 +125,14 @@ export class S0Scene extends Phaser.Scene {
 
   create() {
     this.state = initialStateForLocation(window.location);
-    this.combatBackground = gameplayCombatBackground(this.cache.json.get(ASSET_MANIFEST_KEY));
+    const manifest = this.cache.json.get(ASSET_MANIFEST_KEY);
+    this.combatBackground = gameplayCombatBackground(manifest);
+    this.cardArt = gameplayCardArt(manifest);
     if (this.combatBackground) {
       this.load.image(GAMEPLAY_COMBAT_BACKGROUND.key, this.combatBackground.path);
+    }
+    for (const art of this.cardArt) this.load.image(art.key, art.path);
+    if (this.combatBackground || this.cardArt.length > 0) {
       this.load.once(Phaser.Loader.Events.COMPLETE, () => this.createScene());
       this.load.start();
       return;
@@ -492,6 +517,7 @@ export class S0Scene extends Phaser.Scene {
     const debtCard = hasDebtEffect(card);
     const blocked = !cardPlayable(this.assertCombat(), card);
     g.fillStyle(debtCard ? colors.oxblood : colors.panel, blocked ? 0.68 : 1).fillRect(x, y, cardRect.w, cardRect.h);
+    this.drawCardArt(card, x, y);
     g.lineStyle(1, selected ? colors.gold : blocked ? colors.red : colors.stoneLight, 1).strokeRect(x, y, cardRect.w, cardRect.h);
     this.label(`${card.cost} ${heroCode(card.owner)} ${targetCode(card)}`, x + cardRect.textX, y + cardRect.ownerY, selected ? text.gold : blocked ? text.red : text.mutedBone);
     this.label(compactCardName(card.name), x + cardRect.textX, y + cardRect.nameY, selected ? text.gold : text.bone);
@@ -501,6 +527,16 @@ export class S0Scene extends Phaser.Scene {
       this.tone(MOTION.audio.cardSelectToneHz, MOTION.audio.cardSelectMs);
       this.syncFromState();
     });
+  }
+
+  private drawCardArt(card: CardDef, x: number, y: number): void {
+    const art = this.cardArt.find((entry) => entry.cardId === card.id);
+    if (!art || !this.textures.exists(art.key)) return;
+    const image = this.add.image(x + 49, y + 22, art.key);
+    image.setDisplaySize(18, 34);
+    image.setAlpha(0.62);
+    this.dynamicLabels.add(image);
+    this.tray.fillStyle(colors.void, 0.5).fillRect(x + 40, y + 4, 24, layout.tray.card.h - 8);
   }
 
   private drawSidePanel() {
@@ -524,10 +560,22 @@ export class S0Scene extends Phaser.Scene {
   private drawSelectedCardDetail(card: CardDef) {
     const detail = layout.sidePanel.selectedCard;
     this.sidePanel.fillStyle(colors.panelDeep, 1).fillRect(detail.x, detail.y, detail.w, detail.h);
+    this.drawSelectedCardArt(card);
     this.sidePanel.lineStyle(1, hasDebtEffect(card) ? colors.gold : colors.stoneLight, 1).strokeRect(detail.x, detail.y, detail.w, detail.h);
     this.label(card.name, detail.title.x, detail.title.y, hasDebtEffect(card) ? text.gold : text.bone);
     this.label(`${heroCode(card.owner)}  Cost ${card.cost}  ${targetLabel(card)}`, detail.meta.x, detail.meta.y, text.cyan);
     this.label(cardRules(card), detail.rules.x, detail.rules.y, hasDebtEffect(card) ? text.gold : text.mutedBone);
+  }
+
+  private drawSelectedCardArt(card: CardDef): void {
+    const art = this.cardArt.find((entry) => entry.cardId === card.id);
+    if (!art || !this.textures.exists(art.key)) return;
+    const detail = layout.sidePanel.selectedCard;
+    const image = this.add.image(detail.x + detail.w - 35, detail.y + 22, art.key);
+    image.setDisplaySize(48, 36);
+    image.setAlpha(0.78);
+    this.dynamicLabels.add(image);
+    this.sidePanel.fillStyle(colors.panelDeep, 0.58).fillRect(detail.x, detail.y, detail.w - 70, detail.h);
   }
 
   private drawMiniMap() {
@@ -833,6 +881,7 @@ export class S0Scene extends Phaser.Scene {
       intentText: this.state.combat ? renderIntentText(this.state.combat.enemy.intent) : null,
       gameplayAssets: {
         combatBackground: this.combatBackground,
+        cardArt: this.cardArt.map(({ cardId, assetId, path, approvalGate }) => ({ cardId, assetId, path, approvalGate })),
         enemySprite: null,
       },
       feelSettings: this.feelSettings,
@@ -934,6 +983,24 @@ function gameplayCombatBackground(manifest: unknown): GameplayCombatBackground {
   } catch {
     return null;
   }
+}
+
+function gameplayCardArt(manifest: unknown): readonly GameplayCardArt[] {
+  return Object.entries(GAMEPLAY_CARD_ART).flatMap(([cardId, config]) => {
+    try {
+      const asset = assetFromManifest(manifest, config.id);
+      if (asset.kind !== 'card-art' || asset.approvalGate !== 'approved-for-gameplay') return [];
+      return [{
+        cardId: cardId as keyof typeof GAMEPLAY_CARD_ART,
+        assetId: asset.id,
+        key: config.key,
+        path: asset.previewPath,
+        approvalGate: asset.approvalGate,
+      }];
+    } catch {
+      return [];
+    }
+  });
 }
 
 function targetCode(card: CardDef): string {
