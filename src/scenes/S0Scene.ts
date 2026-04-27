@@ -48,7 +48,11 @@ declare global {
           path: string;
           approvalGate: string;
         }[];
-        enemySprite: null;
+        enemySprite: null | {
+          id: string;
+          path: string;
+          approvalGate: string;
+        };
       };
       feelSettings: FeelSettings;
       lastEvents: readonly GameEvent[];
@@ -76,6 +80,10 @@ const GAMEPLAY_CARD_ART = {
     id: 'card.blood-edge.placeholder',
     key: 'gameplay-card-blood-edge',
   },
+} as const;
+const GAMEPLAY_ENEMY_SPRITE = {
+  id: 'enemy.root-wolf.placeholder',
+  key: 'gameplay-root-wolf-sprite',
 } as const;
 const COMPACT_CARD_NAMES: Record<string, string> = {
   'Ringing Blow': 'Ring Blow',
@@ -105,6 +113,11 @@ type GameplayCardArt = Readonly<{
   path: string;
   approvalGate: string;
 }>;
+type GameplayEnemySprite = Readonly<{
+  id: string;
+  path: string;
+  approvalGate: string;
+}> | null;
 
 export class S0Scene extends Phaser.Scene {
   private state = createSliceState();
@@ -113,6 +126,7 @@ export class S0Scene extends Phaser.Scene {
   private shell!: Phaser.GameObjects.Graphics;
   private explorationBackgroundImage: Phaser.GameObjects.Image | null = null;
   private combatBackgroundImage: Phaser.GameObjects.Image | null = null;
+  private enemySpriteImage: Phaser.GameObjects.Image | null = null;
   private viewport!: Phaser.GameObjects.Graphics;
   private tray!: Phaser.GameObjects.Graphics;
   private sidePanel!: Phaser.GameObjects.Graphics;
@@ -129,6 +143,7 @@ export class S0Scene extends Phaser.Scene {
   private explorationBackground: GameplayExplorationBackground = null;
   private combatBackground: GameplayCombatBackground = null;
   private cardArt: readonly GameplayCardArt[] = [];
+  private enemySprite: GameplayEnemySprite = null;
   private lastEvents: readonly GameEvent[] = [];
 
   constructor() {
@@ -145,6 +160,7 @@ export class S0Scene extends Phaser.Scene {
     this.explorationBackground = gameplayExplorationBackground(manifest);
     this.combatBackground = gameplayCombatBackground(manifest);
     this.cardArt = gameplayCardArt(manifest);
+    this.enemySprite = gameplayEnemySprite(manifest);
     if (this.explorationBackground) {
       this.load.image(GAMEPLAY_EXPLORATION_BACKGROUND.key, this.explorationBackground.path);
     }
@@ -152,7 +168,10 @@ export class S0Scene extends Phaser.Scene {
       this.load.image(GAMEPLAY_COMBAT_BACKGROUND.key, this.combatBackground.path);
     }
     for (const art of this.cardArt) this.load.image(art.key, art.path);
-    if (this.explorationBackground || this.combatBackground || this.cardArt.length > 0) {
+    if (this.enemySprite) {
+      this.load.image(GAMEPLAY_ENEMY_SPRITE.key, this.enemySprite.path);
+    }
+    if (this.explorationBackground || this.combatBackground || this.cardArt.length > 0 || this.enemySprite) {
       this.load.once(Phaser.Loader.Events.COMPLETE, () => this.createScene());
       this.load.start();
       return;
@@ -207,6 +226,12 @@ export class S0Scene extends Phaser.Scene {
       this.combatBackgroundImage.setDisplaySize(VIEWPORT.w - S0_LAYOUT.viewport.innerPad * 2, VIEWPORT.h - S0_LAYOUT.viewport.innerPad * 2);
       this.combatBackgroundImage.setAlpha(0.78);
       this.combatBackgroundImage.setVisible(false);
+    }
+    if (this.enemySprite && this.textures.exists(GAMEPLAY_ENEMY_SPRITE.key)) {
+      this.enemySpriteImage = this.add.image(layout.combat.enemyShadow.x, 111, GAMEPLAY_ENEMY_SPRITE.key);
+      this.enemySpriteImage.setDisplaySize(88, 118);
+      this.enemySpriteImage.setAlpha(0.95);
+      this.enemySpriteImage.setVisible(false);
     }
     this.viewport = this.add.graphics();
     this.tray = this.add.graphics();
@@ -318,6 +343,7 @@ export class S0Scene extends Phaser.Scene {
   private drawViewport() {
     this.explorationBackgroundImage?.setVisible(false);
     this.combatBackgroundImage?.setVisible(false);
+    this.enemySpriteImage?.setVisible(false);
     if (this.state.mode === 'town') {
       this.drawTownView();
       return;
@@ -463,23 +489,29 @@ export class S0Scene extends Phaser.Scene {
 
     const combat = this.assertCombat();
     const enemyTint = hasStatus(combat.enemy.statuses, 'mark') ? colors.gold : colors.oxblood;
-    g.fillStyle(colors.wolfShadow, 1).fillEllipse(
-      combatLayout.enemyShadow.x,
-      combatLayout.enemyShadow.y,
-      combatLayout.enemyShadow.w,
-      combatLayout.enemyShadow.h,
-    );
-    g.fillStyle(enemyTint, 1).fillTriangle(
-      combatLayout.enemyBody.x1,
-      combatLayout.enemyBody.y1,
-      combatLayout.enemyBody.x2,
-      combatLayout.enemyBody.y2,
-      combatLayout.enemyBody.x3,
-      combatLayout.enemyBody.y3,
-    );
-    g.fillStyle(colors.gold, 1)
-      .fillCircle(combatLayout.enemyEyeLeft.x, combatLayout.enemyEyeLeft.y, combatLayout.enemyEyeLeft.radius)
-      .fillCircle(combatLayout.enemyEyeRight.x, combatLayout.enemyEyeRight.y, combatLayout.enemyEyeRight.radius);
+    if (this.enemySpriteImage) {
+      this.enemySpriteImage.setVisible(true);
+      if (hasStatus(combat.enemy.statuses, 'mark')) this.enemySpriteImage.setTint(colors.gold);
+      else this.enemySpriteImage.clearTint();
+    } else {
+      g.fillStyle(colors.wolfShadow, 1).fillEllipse(
+        combatLayout.enemyShadow.x,
+        combatLayout.enemyShadow.y,
+        combatLayout.enemyShadow.w,
+        combatLayout.enemyShadow.h,
+      );
+      g.fillStyle(enemyTint, 1).fillTriangle(
+        combatLayout.enemyBody.x1,
+        combatLayout.enemyBody.y1,
+        combatLayout.enemyBody.x2,
+        combatLayout.enemyBody.y2,
+        combatLayout.enemyBody.x3,
+        combatLayout.enemyBody.y3,
+      );
+      g.fillStyle(colors.gold, 1)
+        .fillCircle(combatLayout.enemyEyeLeft.x, combatLayout.enemyEyeLeft.y, combatLayout.enemyEyeLeft.radius)
+        .fillCircle(combatLayout.enemyEyeRight.x, combatLayout.enemyEyeRight.y, combatLayout.enemyEyeRight.radius);
+    }
     g.lineStyle(1, colors.bone, 1).strokeRect(
       combatLayout.enemyHitBox.x,
       combatLayout.enemyHitBox.y,
@@ -920,7 +952,7 @@ export class S0Scene extends Phaser.Scene {
         explorationBackground: this.explorationBackground,
         combatBackground: this.combatBackground,
         cardArt: this.cardArt.map(({ cardId, assetId, path, approvalGate }) => ({ cardId, assetId, path, approvalGate })),
-        enemySprite: null,
+        enemySprite: this.enemySprite,
       },
       feelSettings: this.feelSettings,
       lastEvents: this.lastEvents,
@@ -1053,6 +1085,20 @@ function gameplayCardArt(manifest: unknown): readonly GameplayCardArt[] {
       return [];
     }
   });
+}
+
+function gameplayEnemySprite(manifest: unknown): GameplayEnemySprite {
+  try {
+    const asset = assetFromManifest(manifest, GAMEPLAY_ENEMY_SPRITE.id);
+    if (asset.kind !== 'sprite' || asset.approvalGate !== 'approved-for-gameplay') return null;
+    return {
+      id: asset.id,
+      path: asset.previewPath,
+      approvalGate: asset.approvalGate,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function targetCode(card: CardDef): string {
