@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ASSET_MANIFEST_KEY, ASSET_MANIFEST_URL, assetFromManifest } from '../assets/manifest';
 import { EventScheduler } from '../fx/eventScheduler';
 import { getInitialFeelSettings, planFeelCues, type FeelCue, type FeelSettings, type FeelTarget } from '../fx/feelScheduler';
 import { GAME_HEIGHT, GAME_WIDTH, S0_LAYOUT, SIDE_PANEL, TRAY, VIEWPORT } from '../game/layout';
@@ -30,6 +31,14 @@ declare global {
       selectedCardSummary: string | null;
       selectedStatusRule: string | null;
       intentText: string | null;
+      gameplayAssets: {
+        combatBackground: null | {
+          id: string;
+          path: string;
+          approvalGate: string;
+        };
+        enemySprite: null;
+      };
       feelSettings: FeelSettings;
       lastEvents: readonly GameEvent[];
       dispatch?: (command: SliceCommand) => readonly GameEvent[];
@@ -43,6 +52,10 @@ const textStyle = THEME.textStyle;
 const layout = S0_LAYOUT;
 const SAVE_KEY = 'hollowmark:s0-save';
 const M1_COMBAT_SEED = 'm1-natural-19';
+const GAMEPLAY_COMBAT_BACKGROUND = {
+  id: 'underroot.combat.placeholder',
+  key: 'gameplay-underroot-combat-background',
+} as const;
 const COMPACT_CARD_NAMES: Record<string, string> = {
   'Ringing Blow': 'Ring Blow',
   'Shadow Mark': 'Shado Mark',
@@ -54,12 +67,18 @@ const COMPACT_CARD_NAMES: Record<string, string> = {
   'Sanctuary Veil': 'Sanct Veil',
 };
 type ExploreMotionCommand = Extract<ExploreCommand, { type: 'step-forward' | 'step-back' | 'turn-left' | 'turn-right' }>;
+type GameplayCombatBackground = Readonly<{
+  id: string;
+  path: string;
+  approvalGate: string;
+}> | null;
 
 export class S0Scene extends Phaser.Scene {
   private state = createSliceState();
   private selectedCardId: CardInstanceId | null = null;
   private audioContext: AudioContext | null = null;
   private shell!: Phaser.GameObjects.Graphics;
+  private combatBackgroundImage: Phaser.GameObjects.Image | null = null;
   private viewport!: Phaser.GameObjects.Graphics;
   private tray!: Phaser.GameObjects.Graphics;
   private sidePanel!: Phaser.GameObjects.Graphics;
@@ -73,14 +92,30 @@ export class S0Scene extends Phaser.Scene {
   private hitStopTimeout: number | null = null;
   private exploreMotionTimer: Phaser.Time.TimerEvent | null = null;
   private queuedExploreMotion: ExploreMotionCommand | null = null;
+  private combatBackground: GameplayCombatBackground = null;
   private lastEvents: readonly GameEvent[] = [];
 
   constructor() {
     super('S0Scene');
   }
 
+  preload(): void {
+    this.load.json(ASSET_MANIFEST_KEY, ASSET_MANIFEST_URL);
+  }
+
   create() {
     this.state = initialStateForLocation(window.location);
+    this.combatBackground = gameplayCombatBackground(this.cache.json.get(ASSET_MANIFEST_KEY));
+    if (this.combatBackground) {
+      this.load.image(GAMEPLAY_COMBAT_BACKGROUND.key, this.combatBackground.path);
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.createScene());
+      this.load.start();
+      return;
+    }
+    this.createScene();
+  }
+
+  private createScene(): void {
     this.buildViews();
     this.bindKey('W', () => this.handleExploreMotion({ type: 'step-forward' }));
     this.bindKey('UP', () => this.handleExploreMotion({ type: 'step-forward' }));
@@ -116,6 +151,12 @@ export class S0Scene extends Phaser.Scene {
   private buildViews() {
     this.cameras.main.setBackgroundColor(colors.void);
     this.shell = this.add.graphics();
+    if (this.combatBackground && this.textures.exists(GAMEPLAY_COMBAT_BACKGROUND.key)) {
+      this.combatBackgroundImage = this.add.image(VIEWPORT.x + VIEWPORT.w / 2, VIEWPORT.y + VIEWPORT.h / 2, GAMEPLAY_COMBAT_BACKGROUND.key);
+      this.combatBackgroundImage.setDisplaySize(VIEWPORT.w - S0_LAYOUT.viewport.innerPad * 2, VIEWPORT.h - S0_LAYOUT.viewport.innerPad * 2);
+      this.combatBackgroundImage.setAlpha(0.78);
+      this.combatBackgroundImage.setVisible(false);
+    }
     this.viewport = this.add.graphics();
     this.tray = this.add.graphics();
     this.sidePanel = this.add.graphics();
@@ -224,6 +265,7 @@ export class S0Scene extends Phaser.Scene {
   }
 
   private drawViewport() {
+    this.combatBackgroundImage?.setVisible(false);
     if (this.state.mode === 'town') {
       this.drawTownView();
       return;
@@ -332,14 +374,24 @@ export class S0Scene extends Phaser.Scene {
     const g = this.viewport;
     const combatLayout = layout.combat;
     const viewport = layout.viewport;
-    g.fillStyle(colors.combatVoid, 1).fillRect(
-      VIEWPORT.x + viewport.innerPad,
-      VIEWPORT.y + viewport.innerPad,
-      VIEWPORT.w - viewport.innerPad * 2,
-      VIEWPORT.h - viewport.innerPad * 2,
-    );
-    g.fillStyle(colors.stone, 1).fillRect(combatLayout.room.x, combatLayout.room.y, combatLayout.room.w, combatLayout.room.h);
-    g.fillStyle(colors.panelDeep, THEME.alpha.combatBackWall).fillRect(combatLayout.backWall.x, combatLayout.backWall.y, combatLayout.backWall.w, combatLayout.backWall.h);
+    if (this.combatBackgroundImage) {
+      this.combatBackgroundImage.setVisible(true);
+      g.fillStyle(colors.void, 0.28).fillRect(
+        VIEWPORT.x + viewport.innerPad,
+        VIEWPORT.y + viewport.innerPad,
+        VIEWPORT.w - viewport.innerPad * 2,
+        VIEWPORT.h - viewport.innerPad * 2,
+      );
+    } else {
+      g.fillStyle(colors.combatVoid, 1).fillRect(
+        VIEWPORT.x + viewport.innerPad,
+        VIEWPORT.y + viewport.innerPad,
+        VIEWPORT.w - viewport.innerPad * 2,
+        VIEWPORT.h - viewport.innerPad * 2,
+      );
+      g.fillStyle(colors.stone, 1).fillRect(combatLayout.room.x, combatLayout.room.y, combatLayout.room.w, combatLayout.room.h);
+      g.fillStyle(colors.panelDeep, THEME.alpha.combatBackWall).fillRect(combatLayout.backWall.x, combatLayout.backWall.y, combatLayout.backWall.w, combatLayout.backWall.h);
+    }
     g.fillStyle(colors.moss, THEME.alpha.combatFloorShadow).fillEllipse(
       combatLayout.floorShadow.x,
       combatLayout.floorShadow.y,
@@ -779,6 +831,10 @@ export class S0Scene extends Phaser.Scene {
       selectedCardSummary: this.selectedCardId && this.state.combat ? cardSummary(cardDefFor(this.state.combat, this.selectedCardId)) : null,
       selectedStatusRule: this.selectedStatusRule(),
       intentText: this.state.combat ? renderIntentText(this.state.combat.enemy.intent) : null,
+      gameplayAssets: {
+        combatBackground: this.combatBackground,
+        enemySprite: null,
+      },
       feelSettings: this.feelSettings,
       lastEvents: this.lastEvents,
     };
@@ -864,6 +920,20 @@ function isM2UnderrootRoute(location: Pick<Location, 'search'>): boolean {
 
 function isLabRoute(location: Pick<Location, 'search'>): boolean {
   return isM1CombatRoute(location) || isM2UnderrootRoute(location);
+}
+
+function gameplayCombatBackground(manifest: unknown): GameplayCombatBackground {
+  try {
+    const asset = assetFromManifest(manifest, GAMEPLAY_COMBAT_BACKGROUND.id);
+    if (asset.kind !== 'background' || asset.approvalGate !== 'approved-for-gameplay') return null;
+    return {
+      id: asset.id,
+      path: asset.previewPath,
+      approvalGate: asset.approvalGate,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function targetCode(card: CardDef): string {
