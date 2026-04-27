@@ -470,6 +470,9 @@ export class S0Scene extends Phaser.Scene {
     }
     this.label('MARROWGATE', 188, 52, text.gold);
     this.label(`Service: ${townServiceName(this.state.townService)}`, 174, 196, text.mutedBone);
+    if (this.state.floorId === 'underroot-m2-placeholder') {
+      this.label(marrowgateRunLine(this.state), 142, 208, this.state.completedInteractions.includes('underroot-boss-1') ? text.cyan : text.gold);
+    }
   }
 
   private drawCombatView() {
@@ -1000,6 +1003,12 @@ function underrootProgressLine(state: SliceState): string {
   const rest = state.completedInteractions.includes('underroot-rest-1') ? 'rest used' : 'rest open';
   const boss = state.completedInteractions.includes('underroot-boss-1') ? 'boss sealed' : 'boss';
   return `Dive R${rewards}/3 F${fights}/6  ${rest}  ${boss}  D${state.townDebt}`;
+}
+
+function marrowgateRunLine(state: SliceState): string {
+  if (state.completedInteractions.includes('underroot-boss-1')) return `Run sealed  ${claimedSpoilsLine(state) || 'No spoils'}  D${state.townDebt}`;
+  if (state.completedInteractions.length > 0) return `Run open  ${underrootProgressLine(state)}`;
+  return 'Run open  Enter the Underroot';
 }
 
 function tileCue(prefix: 'Here' | 'Ahead', tile: FloorTile | null, state: SliceState): string {

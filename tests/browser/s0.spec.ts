@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { ALL_CARDS } from '../../src/data/combat';
 import type { FeelSettings } from '../../src/fx/feelScheduler';
 import type { CardId, CardInstanceId, GameEvent, SliceCommand, SliceState } from '../../src/game/types';
 import { MOTION } from '../../src/game/motion';
@@ -358,6 +359,33 @@ test('M2 browser smoke: Marrowgate enters Underroot and returns with tile progre
   expect(pageErrors).toEqual([]);
 });
 
+test('M2 browser smoke: lab run can seal the Underroot boss and show a town result', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error));
+
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto('/?scene=m2-underroot');
+  await expect(page.locator('canvas')).toBeVisible();
+
+  await dispatchDebug(page, { type: 'enter-underroot' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'step-forward' });
+  await dispatchDebug(page, { type: 'interact' });
+  await expect.poll(async () => (await getDebugState(page)).combat?.enemy.id).toBe('underroot-alpha');
+
+  await finishCurrentCombat(page);
+
+  await expectDebugState(page, (state) => {
+    expect(state.mode).toBe('town');
+    expect(state.completedInteractions).toContain('underroot-boss-1');
+    expect(state.log.at(-1)).toBe('Marrowgate bells answer: the Underroot Alpha is sealed.');
+    expect(state.lastEvents).toContainEqual({ type: 'MARROWGATE_RETURNED' });
+  });
+  expect(pageErrors).toEqual([]);
+});
+
 test('M2 browser smoke: exploration keeps one buffered movement input', async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));
@@ -697,6 +725,36 @@ async function dispatchDebug(page: Page, command: SliceCommand) {
     if (!dispatch) throw new Error('Missing Hollowmark debug dispatch');
     dispatch(debugCommand);
   }, command);
+}
+
+async function finishCurrentCombat(page: Page) {
+  for (let turn = 0; turn < 20; turn += 1) {
+    let played = false;
+    for (let slot = 0; slot < 5; slot += 1) {
+      const state = await getDebugState(page);
+      const combat = state.combat;
+      if (state.mode !== 'combat' || !combat) return;
+      const cardId = combat.hand.find((candidate) => {
+        const def = ALL_CARDS.find((card) => card.id === combat.cards[candidate]?.defId);
+        return def && def.cost <= combat.energy;
+      });
+      if (!cardId) break;
+
+      const def = ALL_CARDS.find((card) => card.id === combat.cards[cardId]?.defId);
+      if (!def) throw new Error(`Missing card def for ${cardId}`);
+      await dispatchDebug(page, def.target.type === 'enemy' ? { type: 'play-card', cardId, target: { kind: 'enemy', id: combat.enemy.id } } : { type: 'play-card', cardId });
+      await page.waitForTimeout(25);
+      played = true;
+      if ((await getDebugState(page)).mode !== 'combat') return;
+    }
+
+    if (!played) await dispatchDebug(page, { type: 'end-turn' });
+    else await dispatchDebug(page, { type: 'end-turn' });
+    await page.waitForTimeout(25);
+    const state = await getDebugState(page);
+    if (state.mode !== 'combat') return;
+  }
+  throw new Error('Combat did not finish within 20 turns');
 }
 
 async function playCardByDefDebug(page: Page, defId: CardId) {
