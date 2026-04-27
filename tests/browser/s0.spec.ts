@@ -22,6 +22,14 @@ declare global {
       selectedCardSummary: string | null;
       selectedStatusRule: string | null;
       intentText: string | null;
+      gameplayAssets: {
+        combatBackground: null | {
+          id: string;
+          path: string;
+          approvalGate: string;
+        };
+        enemySprite: null;
+      };
       feelSettings: FeelSettings;
       lastEvents: readonly GameEvent[];
       dispatch?: (command: SliceCommand) => readonly GameEvent[];
@@ -46,6 +54,14 @@ test('S0 browser smoke: move, hold, win, and capture canvas receipt', async ({ p
   const combatStarted = await getDebugState(page);
   expect(combatStarted.feelSettings.reducedMotion).toBe(false);
   expect(combatStarted.intentText).toBe('Bite Liese for 6');
+  expect(combatStarted.gameplayAssets).toEqual({
+    combatBackground: {
+      id: 'underroot.combat.placeholder',
+      path: '/assets/drafts/underroot/batch-01/underroot-combat-preview-01.png',
+      approvalGate: 'approved-for-gameplay',
+    },
+    enemySprite: null,
+  });
   const baselineObjects = combatStarted.objectCounts.total;
   expect(combatStarted.objectCounts.fx).toBe(0);
   await page.keyboard.press('KeyS');
@@ -676,6 +692,14 @@ async function expectDebugState(
 
 type DebugState = {
   intentText: string | null;
+  gameplayAssets: {
+    combatBackground: null | {
+      id: string;
+      path: string;
+      approvalGate: string;
+    };
+    enemySprite: null;
+  };
   objectCounts: {
     total: number;
     dynamicLabels: number;
@@ -693,11 +717,13 @@ type DebugState = {
 };
 
 async function getDebugState(page: Page): Promise<SliceState & DebugState> {
+  await page.waitForFunction(() => window.__HOLLOWMARK_DEBUG__);
   const debug = await page.evaluate(() => window.__HOLLOWMARK_DEBUG__);
   if (!debug) throw new Error('Missing Hollowmark debug state');
   return {
     ...debug.state,
     intentText: debug.intentText,
+    gameplayAssets: debug.gameplayAssets,
     objectCounts: debug.objectCounts,
     pendingEvents: debug.pendingEvents,
     selectedCardId: debug.selectedCardId,
