@@ -21,7 +21,7 @@ describe('asset manifest', () => {
     const expectedStates = new Map([
       ['underroot.corridor.placeholder', 'approved'],
       ['underroot.combat.placeholder', 'approved'],
-      ['enemy.root-wolf.placeholder', 'in_game_previewed'],
+      ['enemy.root-wolf.placeholder', 'approved'],
       ['card.blood-edge.placeholder', 'approved'],
       ['ui.ornaments.placeholder', 'rejected'],
     ]);
@@ -41,9 +41,9 @@ describe('asset manifest', () => {
 
     expect(gates.get('underroot.combat.placeholder')).toBe('approved-for-gameplay');
     expect(gates.get('underroot.corridor.placeholder')).toBe('approved-for-gameplay');
+    expect(gates.get('enemy.root-wolf.placeholder')).toBe('approved-for-gameplay');
     expect(gates.get('card.blood-edge.placeholder')).toBe('approved-for-gameplay');
     expect(gates.get('ui.ornaments.placeholder')).toBe('blocked');
-    expect(gates.get('enemy.root-wolf.placeholder')).toBe('needs-review');
   });
 
   it('looks up review assets by stable id', () => {

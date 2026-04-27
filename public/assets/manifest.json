@@ -61,10 +61,10 @@
       },
       "palette": "draft-generated",
       "cropNotes": "Batch 02 source downsampled to 96x128. Stronger connected body silhouette than batch 01, with fewer rear-leg/twig islands at sprite scale.",
-      "matteOrMaskNotes": "Flat blue-gray background removed with tolerance 54 from edge-connected matte. Edge read is improved; still needs in-game approval review before gameplay use.",
-      "humanEditNotes": "Batch 02 draft selected from six generated candidates and previewed against checkerboard plus approved combat background. Keep at in_game_previewed until human approval.",
-      "inGamePreview": "?scene=visual-gallery",
-      "approvalState": "in_game_previewed",
+      "matteOrMaskNotes": "Flat blue-gray background removed with tolerance 54 from edge-connected matte. Edge read passed checkerboard and approved combat-background review.",
+      "humanEditNotes": "Batch 02 draft selected from six generated candidates. Approved after checkerboard alpha review plus Combat Sandbox composition review.",
+      "inGamePreview": "?scene=combat-sandbox",
+      "approvalState": "approved",
       "rejectionNotes": null
     },
     {

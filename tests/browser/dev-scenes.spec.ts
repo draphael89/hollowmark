@@ -57,8 +57,8 @@ test('combat sandbox previews cues without rebuilding the shell', async ({ page 
     backgroundApprovalState: 'approved',
     enemyId: 'enemy.root-wolf.placeholder',
     enemyPath: '/assets/drafts/underroot/batch-02/rootbitten-wolf-preview-01.png',
-    enemyApprovalState: 'in_game_previewed',
-    compositionGate: 'needs-review',
+    enemyApprovalState: 'approved',
+    compositionGate: 'approved-for-gameplay',
   });
   expect(new Set(sandbox?.hand).size).toBe(sandbox?.hand.length);
   expect(sandbox?.selectedCard).toEqual(expect.objectContaining({
@@ -237,6 +237,7 @@ test('visual gallery exposes stable placeholder manifest selection', async ({ pa
   expect(debug.visualGallery?.gameplayReadyAssetIds).toEqual([
     'underroot.corridor.placeholder',
     'underroot.combat.placeholder',
+    'enemy.root-wolf.placeholder',
     'card.blood-edge.placeholder',
   ]);
   expect(debug.visualGallery?.stableIds).toEqual([
