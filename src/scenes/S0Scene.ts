@@ -5,7 +5,7 @@ import { getInitialFeelSettings, planFeelCues, type FeelCue, type FeelSettings, 
 import { GAME_HEIGHT, GAME_WIDTH, S0_LAYOUT, SIDE_PANEL, TRAY, VIEWPORT } from '../game/layout';
 import { MOTION } from '../game/motion';
 import { THEME } from '../game/theme';
-import type { CardDef, CardInstanceId, CombatState, ExploreCommand, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId, TownCommand } from '../game/types';
+import type { CardDef, CardInstanceId, CombatState, ExploreCommand, GameEvent, HeroId, HeroState, SliceCommand, SliceState, StatusId, TilePurpose, TownCommand } from '../game/types';
 import { M1_STARTER_CARDS } from '../data/combat';
 import { cardDefFor, createCombatWithCards, renderIntentText } from '../systems/combat';
 import { floorForId } from '../data/floors';
@@ -434,6 +434,18 @@ export class S0Scene extends Phaser.Scene {
     }
 
     this.label(`Facing ${this.state.facing.toUpperCase()}  ${current.coord.x},${current.coord.y}`, viewport.facingLabel.x, viewport.facingLabel.y);
+    if (this.state.floorId === 'underroot-m2-placeholder') {
+      this.drawTilePurposeCue(current.tile?.purpose ?? 'side-path', front.tile?.purpose ?? 'side-path');
+    }
+  }
+
+  private drawTilePurposeCue(current: TilePurpose, front: TilePurpose): void {
+    const g = this.viewport;
+    const color = purposeColor(current);
+    g.fillStyle(colors.void, 0.68).fillRect(28, 184, 342, 28);
+    g.lineStyle(1, color, 1).strokeRect(28, 184, 342, 28);
+    this.label(`${purposeIcon(current)} Here: ${purposeLabel(current)}`, 38, 191, purposeText(current));
+    this.label(`${purposeIcon(front)} Ahead: ${purposeLabel(front)}`, 200, 191, purposeText(front));
   }
 
   private drawTownView() {
@@ -542,7 +554,10 @@ export class S0Scene extends Phaser.Scene {
     }
 
     if (this.state.mode !== 'combat' && this.state.mode !== 'victory' && this.state.mode !== 'defeat') {
-      this.label(this.state.log.slice(-3).join('\n'), tray.log.x, tray.log.y);
+      this.label(this.state.log.slice(-2).join('\n'), tray.log.x, tray.log.y);
+      if (this.state.floorId === 'underroot-m2-placeholder') {
+        this.label(underrootProgressLine(this.state), tray.exploreHint.x, tray.exploreHint.y - 12, text.gold);
+      }
       this.label('W/S step   A/D turn   Space interact', tray.exploreHint.x, tray.exploreHint.y, text.mutedBone);
       return;
     }
@@ -701,7 +716,8 @@ export class S0Scene extends Phaser.Scene {
       return;
     }
     if (this.state.mode === 'explore') {
-      this.label(`${threat}     ${pressureCue(this.state)}     W/S step     A/D turn     Space interact`, layout.footer.label.x, layout.footer.label.y, this.state.threat === 'hunted' ? text.gold : text.mutedBone);
+      const progress = this.state.floorId === 'underroot-m2-placeholder' ? `     ${underrootProgressLine(this.state)}` : '';
+      this.label(`${threat}     ${pressureCue(this.state)}${progress}`, layout.footer.label.x, layout.footer.label.y, this.state.threat === 'hunted' ? text.gold : text.mutedBone);
       return;
     }
     if (this.state.mode === 'town') {
@@ -975,6 +991,51 @@ function pressureCue(state: SliceState): string {
   return 'quiet pressure';
 }
 
+function underrootProgressLine(state: SliceState): string {
+  const rewards = countCompleted(state, 'underroot-reward-');
+  const fights = countCompleted(state, 'underroot-normal-') + countCompleted(state, 'underroot-elite-');
+  const rest = state.completedInteractions.includes('underroot-rest-1') ? 'rest used' : 'rest open';
+  const boss = state.completedInteractions.includes('underroot-boss-1') ? 'boss sealed' : 'boss';
+  return `Dive R${rewards}/3 F${fights}/6  ${rest}  ${boss}  D${state.townDebt}`;
+}
+
+function countCompleted(state: SliceState, prefix: string): number {
+  return state.completedInteractions.filter((id) => id.startsWith(prefix)).length;
+}
+
+function purposeIcon(purpose: TilePurpose): string {
+  if (purpose === 'rest') return '+';
+  if (purpose === 'reward') return '*';
+  if (purpose === 'shortcut') return '>';
+  if (purpose === 'boss-pressure') return '!';
+  if (purpose === 'encounter') return '!';
+  if (purpose === 'return') return '<';
+  if (purpose === 'start') return '@';
+  return '.';
+}
+
+function purposeLabel(purpose: TilePurpose): string {
+  if (purpose === 'boss-pressure') return 'boss';
+  if (purpose === 'side-path') return 'side path';
+  return purpose;
+}
+
+function purposeColor(purpose: TilePurpose): number {
+  if (purpose === 'rest') return colors.moss;
+  if (purpose === 'reward') return colors.gold;
+  if (purpose === 'shortcut' || purpose === 'return') return colors.cyan;
+  if (purpose === 'boss-pressure' || purpose === 'encounter') return colors.red;
+  return colors.stoneLight;
+}
+
+function purposeText(purpose: TilePurpose): string {
+  if (purpose === 'rest') return text.cyan;
+  if (purpose === 'reward') return text.gold;
+  if (purpose === 'shortcut' || purpose === 'return') return text.cyan;
+  if (purpose === 'boss-pressure' || purpose === 'encounter') return text.red;
+  return text.mutedBone;
+}
+
 function exploreMotionDuration(command: ExploreMotionCommand, events: readonly GameEvent[]): number {
   if (events.some((event) => event.type === 'STEP_BUMPED')) return MOTION.explore.bumpMs;
   if (events.some((event) => event.type === 'STEP_MOVED')) {
@@ -1017,7 +1078,8 @@ function heroCode(heroId: HeroId): string {
 
 function initialStateForLocation(location: Pick<Location, 'search'>): SliceState {
   if (isM2UnderrootRoute(location)) return createTownState('m2-underroot');
-  if (!isM1CombatRoute(location)) return loadSavedState();
+  if (isS0Route(location)) return loadSavedState();
+  if (!isM1CombatRoute(location)) return createTownState('m2-underroot');
   const state = createSliceState(M1_COMBAT_SEED);
   return {
     ...state,
@@ -1027,6 +1089,10 @@ function initialStateForLocation(location: Pick<Location, 'search'>): SliceState
     combat: createCombatWithCards(M1_COMBAT_SEED, M1_STARTER_CARDS),
     log: ['M1 starter combat lab.'],
   };
+}
+
+function isS0Route(location: Pick<Location, 'search'>): boolean {
+  return new URLSearchParams(location.search).get('scene') === 's0';
 }
 
 function isM1CombatRoute(location: Pick<Location, 'search'>): boolean {
