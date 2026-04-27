@@ -141,7 +141,7 @@ function applyTownCommand(state: SliceState, command: TownCommand): CommandResul
 
 function townServiceLog(service: SliceState['townService']): string {
   if (service === 'gate') return 'The Gate waits with its black stair.';
-  if (service === 'vellum') return 'The Vellum lays the starter deck in a careful grid.';
+  if (service === 'vellum') return `The Vellum lays ${M1_STARTER_CARDS.length} starter cards in a careful grid.`;
   return 'The Sanctuary counts wounds and debt.';
 }
 
