@@ -165,6 +165,20 @@ describe('S0 combat', () => {
     }));
   });
 
+  it('uses the current enemy name in combat log lines', () => {
+    const base = createCombat('test-seed');
+    const combat = {
+      ...base,
+      enemy: { ...base.enemy, name: 'Underroot Alpha', hp: 6, maxHp: 42 },
+    };
+    const result = playCard(combat, card(combat, 'iron-cut'));
+
+    expect(result.combat.log.slice(-2)).toEqual([
+      'Underroot Alpha takes 6.',
+      'Underroot Alpha falls into the roots.',
+    ]);
+  });
+
   it('makes Blood Edge stronger while adding debt to its owner', () => {
     const combat = createCombat('test-seed');
     const result = playCard(combat, card(combat, 'blood-edge'));

@@ -535,10 +535,10 @@ function effectLogLines(before: CombatState, after: CombatState, card: CardDef):
     if (effect.type === 'damage') lines.push(`${after.enemy.name} takes ${Math.max(0, before.enemy.hp - after.enemy.hp)}.`);
     if (effect.type === 'gain-block') lines.push(`${heroName(card.owner, before.heroes)} braces. +${effect.amount} Block.`);
     if (effect.type === 'heal') lines.push(`${heroName(card.owner, before.heroes)} mends the party light.`);
-    if (effect.type === 'apply-status' && effect.status === 'mark') lines.push(`${heroName(card.owner, before.heroes)} marks the wolf.`);
+    if (effect.type === 'apply-status' && effect.status === 'mark') lines.push(`${heroName(card.owner, before.heroes)} marks ${before.enemy.name}.`);
     if (effect.type === 'gain-debt') lines.push(`The Mark drinks from ${heroName(card.owner, before.heroes)}. +${effect.amount} debt.`);
   }
-  if (after.enemy.hp === 0 && before.enemy.hp > 0) lines.push('The wolf falls into the roots.');
+  if (after.enemy.hp === 0 && before.enemy.hp > 0) lines.push(`${before.enemy.name} falls into the roots.`);
   return lines;
 }
 

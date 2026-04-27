@@ -421,6 +421,7 @@ function resolveCombatVictory(state: SliceState, combat: NonNullable<SliceState[
   }
 
   const returnedToTown = state.combatReturn === 'town';
+  const returnLine = returnedToTown ? townReturnLine(state) : 'The Underroot path opens again.';
   return {
     state: {
       ...state,
@@ -429,10 +430,15 @@ function resolveCombatVictory(state: SliceState, combat: NonNullable<SliceState[
       completedInteractions: [...state.completedInteractions, state.activeInteractionId],
       activeInteractionId: null,
       combatReturn: null,
-      log: [...state.log, ...combat.log.slice(-3), returnedToTown ? 'Marrowgate takes the party back in.' : 'The Underroot path opens again.'],
+      log: [...state.log, ...combat.log.slice(-3), returnLine],
     },
     events: returnedToTown ? [...events, completedEvent, { type: 'MARROWGATE_RETURNED' }] : [...events, completedEvent],
   };
+}
+
+function townReturnLine(state: SliceState): string {
+  if (state.activeInteractionId === 'underroot-boss-1') return 'Marrowgate bells answer: the Underroot Alpha is sealed.';
+  return 'Marrowgate takes the party back in.';
 }
 
 function withCombat(state: SliceState, combat: NonNullable<SliceState['combat']>): SliceState {
